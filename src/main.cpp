@@ -162,6 +162,10 @@ void status()
   StaticJsonBuffer<500> jsonBuffer;
   JsonObject &root = jsonBuffer.createObject();
   root["status"] = busy;
+  for(int i=0;i<6;i++)
+  {
+      root["portstatus"] = ports;
+  }
   char jsonChar[500];
   root.printTo((char *)jsonChar, root.measureLength() + 1);
   server.send(200, "application/json", jsonChar);
@@ -231,8 +235,8 @@ void run()
 
 void flip()
 {
-  int state = digitalRead(LED_BUILTIN); // get the current state of GPIO1 pin
-  digitalWrite(LED_BUILTIN, !state);    // set pin to the opposite state
+  int state = digitalRead(b_led); // get the current state of GPIO1 pin
+  digitalWrite(b_led, !state);    // set pin to the opposite state
 
   for (int i = 0; i < 6; i++)
   {
@@ -275,7 +279,7 @@ void setup()
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("pksy", "04qwerty");
   // WiFiMulti.addAP("SP", "04qwerty");
-  // WiFiMulti.addAP("SP1", "04qwerty");
+   WiFiMulti.addAP("ky_MIFI", "04qwerty");
   WiFiMulti.addAP("SP3", "04qwerty");
 
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
