@@ -10,13 +10,15 @@
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266httpUpdate.h>
 #include "Timer.h"
+#include <Ticker.h>
 
+Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
 ESP8266WebServer server(80);
-Timer t;
+Timer t, t2;
 boolean busy = false;
-
+int count = 0;
 #define DHTPIN D3 // Pin which is connected to the DHT sensor.
 
 #define DHTTYPE DHT22 // DHT 22 (AM2302)
@@ -27,7 +29,19 @@ int ktcCS = 13;
 int ktcCLK = 14;
 float a0value;
 float rawvalue = 0;
+class Portio
+{
+public:
+  int port;
+  int value;
+  int delay;
+  int waittime;
+  int run = 0;
+  Portio *n;
+  Portio *p;
+};
 
+Portio ports[6];
 void readDHT()
 {
 
@@ -97,6 +111,15 @@ void checkin()
   http.end(); //Close connection
   busy = false;
 }
+void setport()
+{
+  ports[0].port = D1;
+  ports[1].port = D2;
+  ports[2].port = D5;
+  ports[3].port = D6;
+  ports[4].port = D7;
+  ports[5].port = D8;
+}
 int getPort(String p)
 {
   if (p == "D1")
@@ -162,6 +185,28 @@ void DHTtoJSON()
   json.printTo((char *)jsonChar, json.measureLength() + 1);
   server.send(200, "application/json", jsonChar);
 }
+void addTorun(int port, int delay, int value, int wait)
+{
+
+  for (int i = 0; i < 6; i++)
+  {
+    if (ports[i].port == port)
+    {
+      if (!ports[i].run)
+      {
+        ports[i].value = value;
+        ports[i].delay = delay;
+        ports[i].waittime = wait;
+        ports[i].run = 1;
+        digitalWrite(ports[i].port, value);
+      }
+      else
+      {
+        Serial.println("this port running");
+      }
+    }
+  }
+}
 void run()
 {
   busy = true;
@@ -175,17 +220,46 @@ void run()
 
   //int d = server.arg("delay").toInt();
   int port = getPort(p);
-  digitalWrite(port, value);
+  addTorun(port, d.toInt(), v.toInt(), w.toInt());
+  // digitalWrite(port, value);
   server.send(200, "application/json", "ok");
-  delay(d.toInt() * 1000);
-  digitalWrite(port, !value);
-  delay(w.toInt() * 1000);
-  busy = false;
+  // delay(d.toInt() * 1000);
+  // digitalWrite(port, !value);
+  // delay(w.toInt() * 1000);
+  // busy = false;
 }
 
+void flip()
+{
+  int state = digitalRead(LED_BUILTIN); // get the current state of GPIO1 pin
+  digitalWrite(LED_BUILTIN, !state);    // set pin to the opposite state
+
+  for (int i = 0; i < 6; i++)
+  {
+    //  Serial.println("Check port " + ports[i].port);
+    if (ports[i].delay > 0)
+    {
+      ports[i].delay--;
+      Serial.print("Port  ");
+      Serial.println(ports[i].port);
+      Serial.print(" Delay ");
+      Serial.println(ports[i].delay);
+      if (ports[i].delay == 0)
+      {
+        ports[i].run = 0;
+        digitalWrite(ports[i].port, !ports[i].value);
+        Serial.println("End job");
+      }
+    }
+
+    if (ports[i].delay == 0)
+      ports[i].run = 0;
+  }
+}
 void setup()
 {
   Serial.begin(9600);
+  WiFi.mode(WIFI_STA);
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
   pinMode(b_led, OUTPUT);
@@ -196,11 +270,13 @@ void setup()
   pinMode(D7, OUTPUT);
   pinMode(D8, OUTPUT);
 
+  setport();
   // connect();
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("pksy", "04qwerty");
-  WiFiMulti.addAP("SP", "04qwerty");
-  WiFiMulti.addAP("SP1", "04qwerty");
+  // WiFiMulti.addAP("SP", "04qwerty");
+  // WiFiMulti.addAP("SP1", "04qwerty");
+  WiFiMulti.addAP("SP3", "04qwerty");
 
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
@@ -219,16 +295,17 @@ void setup()
   String mac = WiFi.macAddress();
   Serial.println(mac); // แสดงหมายเลข IP ของ Server
   t.every(60000, checkin);
+  flipper.attach(1, flip);
 }
 
 void loop()
 {
   server.handleClient();
   t.update();
-  digitalWrite(b_led, 0);
-  delay(500);
-  digitalWrite(b_led, 1);
-  delay(500);
+  // digitalWrite(b_led, 0);
+  // delay(500);
+  // digitalWrite(b_led, 1);
+  // delay(500);
 
   // put your main code here, to run repeatedly:
 }
