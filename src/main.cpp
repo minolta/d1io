@@ -11,7 +11,9 @@
 #include <ESP8266httpUpdate.h>
 #include "Timer.h"
 #include <Ticker.h>
-
+#include <Wire.h>
+#include "SSD1306.h"
+SSD1306 display(0x3C, D2, D1);
 Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
@@ -42,6 +44,15 @@ public:
 };
 
 Portio ports[6];
+
+void disp_data(void)
+{
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(1, 1, "DHT22 TESTER");
+  display.display();
+}
 void readDHT()
 {
 
@@ -80,11 +91,11 @@ void readDHT()
 void checkin()
 {
   busy = true;
-  StaticJsonBuffer<300> JSONbuffer;
-  JsonObject &JSONencoder = JSONbuffer.createObject();
-  JSONencoder["mac"] = WiFi.macAddress();
-  JSONencoder["password"] = "";
-  JSONencoder["ip"] = WiFi.localIP().toString();
+  StaticJsonDocument<500> doc;
+
+  doc["mac"] = WiFi.macAddress();
+  doc["password"] = "";
+  doc["ip"] = WiFi.localIP().toString();
   // JSONencoder["t"] = pfTemp;
   // JSONencoder["h"] = pfHum;
   // JsonObject &dht = JSONencoder.createNestedObject("dhtvalue");
@@ -92,7 +103,8 @@ void checkin()
   // dht["h"] = pfHum;
 
   char JSONmessageBuffer[300];
-  JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  // JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  serializeJsonPretty(doc, JSONmessageBuffer, 300);
   Serial.println(JSONmessageBuffer);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
@@ -159,34 +171,29 @@ int getPort(String p)
 }
 void status()
 {
-  StaticJsonBuffer<500> jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["status"] = busy;
-  for(int i=0;i<6;i++)
-  {
-      root["portstatus"] = ports;
-  }
-  char jsonChar[500];
-  root.printTo((char *)jsonChar, root.measureLength() + 1);
-  server.send(200, "application/json", jsonChar);
+  // StaticJsonBuffer<500> jsonBuffer;
+  // JsonObject &root = jsonBuffer.createObject();
+  // root["status"] = busy;
+  // for (int i = 0; i < 6; i++)
+  // {
+  //   root["portstatus"] = ports;
+  // }
+  // char jsonChar[500];
+  // root.printTo((char *)jsonChar, root.measureLength() + 1);
+  // server.send(200, "application/json", jsonChar);
 }
-JsonObject &prepareResponse(JsonBuffer &jsonBuffer)
-{
-  JsonObject &root = jsonBuffer.createObject();
-  root["t"] = pfTemp;
-  root["h"] = pfHum;
-  root["ip"] = WiFi.macAddress();
-  return root;
-}
+ 
 void DHTtoJSON()
 {
-  digitalWrite(b_led, LOW);
+ digitalWrite(b_led, LOW);
   readDHT();
   digitalWrite(b_led, HIGH);
-  StaticJsonBuffer<300> jsonBuffer;
-  JsonObject &json = prepareResponse(jsonBuffer);
+  StaticJsonDocument<500> doc;
+  doc["t"] = pfTemp;
+  doc["h"] = pfHum;
+  doc["ip"] = WiFi.macAddress();
   char jsonChar[100];
-  json.printTo((char *)jsonChar, json.measureLength() + 1);
+  serializeJsonPretty(doc, jsonChar, 100);
   server.send(200, "application/json", jsonChar);
 }
 void addTorun(int port, int delay, int value, int wait)
@@ -264,8 +271,8 @@ void setup()
 {
   Serial.begin(9600);
   WiFi.mode(WIFI_STA);
-  pinMode(D1, OUTPUT);
-  pinMode(D2, OUTPUT);
+  //pinMode(D1, OUTPUT);
+  // pinMode(D2, OUTPUT);
   pinMode(b_led, OUTPUT);
   //pinMode(D3, OUTPUT);
   // pinMode(D4, OUTPUT);
@@ -274,13 +281,18 @@ void setup()
   pinMode(D7, OUTPUT);
   pinMode(D8, OUTPUT);
 
+  display.init();
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+  disp_data();
   setport();
+    WiFiMulti.addAP("forpi", "04qwerty");
   // connect();
-  WiFiMulti.addAP("Sirifarm", "0932154741");
-  WiFiMulti.addAP("pksy", "04qwerty");
+  // WiFiMulti.addAP("Sirifarm", "0932154741");
+  // WiFiMulti.addAP("pksy", "04qwerty");
   // WiFiMulti.addAP("SP", "04qwerty");
-   WiFiMulti.addAP("ky_MIFI", "04qwerty");
-  WiFiMulti.addAP("SP3", "04qwerty");
+  // WiFiMulti.addAP("ky_MIFI", "04qwerty");
+  // WiFiMulti.addAP("SP3", "04qwerty");
 
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
