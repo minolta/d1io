@@ -13,7 +13,12 @@
 #include <Ticker.h>
 #include <Wire.h>
 #include "SSD1306.h"
-SSD1306 display(0x3C, D2, D1);
+#define useI2C 1
+#define ioport 7
+// SSD1306 display(0x3C, D2, D1);
+//D2 = SDA  D1 = SCL
+SSD1306 display(0x3C, RX, TX);
+
 Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
@@ -39,19 +44,62 @@ public:
   int delay;
   int waittime;
   int run = 0;
+  String closetime;
   Portio *n;
   Portio *p;
 };
 
-Portio ports[6];
+Portio ports[ioport];
 
 void disp_data(void)
 {
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setFont(ArialMT_Plain_10);
-  display.drawString(1, 1, "DHT22 TESTER");
+  display.drawString(20, 1, "D1 io ");
+  display.drawString(80, 1, "IP" + WiFi.localIP().toString());
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(1, 20, "H:");
+
   display.display();
+}
+void status()
+{
+  StaticJsonDocument<500> doc;
+
+  for (int i = 0; i < ioport; i++)
+  {
+
+    JsonObject o = doc.createNestedObject(new String(i));
+    o["port"] = ports[i].port;
+    o["closetime"] = ports[i].closetime;
+    o["delay"] = ports[i].delay;
+  }
+
+  char jsonChar[500];
+  serializeJsonPretty(doc, jsonChar, 500);
+  server.send(200, "application/json", jsonChar);
+}
+void setclosetime()
+{
+
+  int s = server.arg("time").toInt();
+  // timetocount = s;
+  digitalWrite(D5, 1);
+
+  String closetime = server.arg("closetime");
+  ports[2].delay = s;
+  ports[2].value = 1;
+  ports[2].closetime = closetime;
+  StaticJsonDocument<500> doc;
+
+  doc["run"] = "ok";
+  doc["countime"] = s;
+  doc["closeat"] = closetime;
+  char jsonChar[100];
+  serializeJsonPretty(doc, jsonChar, 100);
+  server.send(200, "application/json", jsonChar);
 }
 void readDHT()
 {
@@ -131,6 +179,7 @@ void setport()
   ports[3].port = D6;
   ports[4].port = D7;
   ports[5].port = D8;
+  ports[6].port = D3;
 }
 int getPort(String p)
 {
@@ -142,7 +191,7 @@ int getPort(String p)
   {
     return D2;
   }
-  /*  else if (p == "D3")
+  else if (p == "D3")
   {
     return D3;
   }
@@ -151,7 +200,7 @@ int getPort(String p)
   {
     return D4;
   }
-  */
+
   else if (p == "D5")
   {
     return D5;
@@ -169,23 +218,10 @@ int getPort(String p)
     return D8;
   }
 }
-void status()
-{
-  // StaticJsonBuffer<500> jsonBuffer;
-  // JsonObject &root = jsonBuffer.createObject();
-  // root["status"] = busy;
-  // for (int i = 0; i < 6; i++)
-  // {
-  //   root["portstatus"] = ports;
-  // }
-  // char jsonChar[500];
-  // root.printTo((char *)jsonChar, root.measureLength() + 1);
-  // server.send(200, "application/json", jsonChar);
-}
- 
+
 void DHTtoJSON()
 {
- digitalWrite(b_led, LOW);
+  digitalWrite(b_led, LOW);
   readDHT();
   digitalWrite(b_led, HIGH);
   StaticJsonDocument<500> doc;
@@ -199,22 +235,23 @@ void DHTtoJSON()
 void addTorun(int port, int delay, int value, int wait)
 {
 
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < ioport; i++)
   {
     if (ports[i].port == port)
     {
-      if (!ports[i].run)
-      {
-        ports[i].value = value;
-        ports[i].delay = delay;
-        ports[i].waittime = wait;
-        ports[i].run = 1;
-        digitalWrite(ports[i].port, value);
-      }
-      else
-      {
-        Serial.println("this port running");
-      }
+      // if (!ports[i].run)
+      // {
+      ports[i].value = value;
+      ports[i].delay = delay;
+      ports[i].waittime = wait;
+      ports[i].run = 1;
+      digitalWrite(ports[i].port, value);
+      Serial.println("Set port");
+      // }
+      // else
+      // {
+      //   Serial.println("this port running");
+      // }
     }
   }
 }
@@ -245,7 +282,7 @@ void flip()
   int state = digitalRead(b_led); // get the current state of GPIO1 pin
   digitalWrite(b_led, !state);    // set pin to the opposite state
 
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < ioport; i++)
   {
     //  Serial.println("Check port " + ports[i].port);
     if (ports[i].delay > 0)
@@ -271,22 +308,19 @@ void setup()
 {
   Serial.begin(9600);
   WiFi.mode(WIFI_STA);
-  //pinMode(D1, OUTPUT);
-  // pinMode(D2, OUTPUT);
+  pinMode(D1, OUTPUT);
+  pinMode(D2, OUTPUT);
   pinMode(b_led, OUTPUT);
-  //pinMode(D3, OUTPUT);
-  // pinMode(D4, OUTPUT);
+  // pinMode(D3, INPUT);
+  // pinMode(D4, INPUT);
   pinMode(D5, OUTPUT);
   pinMode(D6, OUTPUT);
   pinMode(D7, OUTPUT);
   pinMode(D8, OUTPUT);
 
-  display.init();
-  display.flipScreenVertically();
-  display.setFont(ArialMT_Plain_10);
-  disp_data();
   setport();
-    WiFiMulti.addAP("forpi", "04qwerty");
+  WiFiMulti.addAP("forpi", "04qwerty");
+  WiFiMulti.addAP("forpi2", "04qwerty");
   // connect();
   // WiFiMulti.addAP("Sirifarm", "0932154741");
   // WiFiMulti.addAP("pksy", "04qwerty");
@@ -299,10 +333,10 @@ void setup()
     delay(500);
     Serial.print(".");
   }
-
   server.on("/run", run);
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
+  server.on("/setclosetime", setclosetime);
 
   //  server.on("/info", info);
   server.begin(); //เปิด TCP Server
@@ -310,8 +344,15 @@ void setup()
   Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
   String mac = WiFi.macAddress();
   Serial.println(mac); // แสดงหมายเลข IP ของ Server
+#ifdef useI2C
+  display.init();
+  display.flipScreenVertically();
+  disp_data();
+#endif
+
   t.every(60000, checkin);
   flipper.attach(1, flip);
+  dht.begin();
 }
 
 void loop()
