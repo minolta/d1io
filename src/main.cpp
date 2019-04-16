@@ -322,7 +322,7 @@ void setup()
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   // connect();
-  // WiFiMulti.addAP("Sirifarm", "0932154741");
+  WiFiMulti.addAP("Sirifarm", "0932154741");
   // WiFiMulti.addAP("pksy", "04qwerty");
   // WiFiMulti.addAP("SP", "04qwerty");
   // WiFiMulti.addAP("ky_MIFI", "04qwerty");
