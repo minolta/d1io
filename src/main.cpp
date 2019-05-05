@@ -386,4 +386,9 @@ void loop()
   // delay(500);
 
   // put your main code here, to run repeatedly:
+
+  if (!WiFiMulti.run() == WL_CONNECTED)
+  {
+    WiFi.reconnect();
+  }
 }
