@@ -13,7 +13,7 @@
 #include <Ticker.h>
 #include <Wire.h>
 #include "SSD1306.h"
-#define useI2C 1
+// #define useI2C 1
 #define ioport 7
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
@@ -270,13 +270,31 @@ void run()
   int port = getPort(p);
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
   // digitalWrite(port, value);
-  server.send(200, "application/json", "ok");
+  // server.send(200, "application/json", "ok");
+  StaticJsonDocument<500> doc;
+  doc["status"] = "ok";
+  doc["port"] = p;
+  doc["runtime"] = d;
+  doc["value"] = value;
+  doc["mac"] = WiFi.macAddress();
+  doc["ip"] = WiFi.localIP().toString();
+  char jsonChar[500];
+  serializeJsonPretty(doc, jsonChar, 500);
+  server.send(200, "applic ation/json", jsonChar);
   // delay(d.toInt() * 1000);
   // digitalWrite(port, !value);
   // delay(w.toInt() * 1000);
   // busy = false;
 }
+void ssid()
+{
+  StaticJsonDocument<500> doc;
+  doc["ssid"] = WiFi.SSID();
 
+  char jsonChar[500];
+  serializeJsonPretty(doc, jsonChar, 500);
+  server.send(200, "applic ation/json", jsonChar);
+}
 void flip()
 {
   int state = digitalRead(b_led); // get the current state of GPIO1 pin
@@ -319,10 +337,11 @@ void setup()
   pinMode(D8, OUTPUT);
 
   setport();
+  WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   // connect();
-  WiFiMulti.addAP("Sirifarm", "0932154741");
+  // WiFiMulti.addAP("Sirifarm", "0932154741");
   // WiFiMulti.addAP("pksy", "04qwerty");
   // WiFiMulti.addAP("SP", "04qwerty");
   // WiFiMulti.addAP("ky_MIFI", "04qwerty");
@@ -333,7 +352,12 @@ void setup()
     delay(500);
     Serial.print(".");
   }
+
+  Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
+  String mac = WiFi.macAddress();
+  Serial.println(mac); // แสดงหมายเลข IP ของ Server
   server.on("/run", run);
+  server.on("/ssid", ssid);
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
   server.on("/setclosetime", setclosetime);
@@ -341,9 +365,6 @@ void setup()
   //  server.on("/info", info);
   server.begin(); //เปิด TCP Server
   Serial.println("Server started");
-  Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
-  String mac = WiFi.macAddress();
-  Serial.println(mac); // แสดงหมายเลข IP ของ Server
 #ifdef useI2C
   display.init();
   display.flipScreenVertically();
