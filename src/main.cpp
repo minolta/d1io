@@ -13,12 +13,22 @@
 #include <Ticker.h>
 #include <Wire.h>
 #include "SSD1306.h"
+// #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
 
+class Dhtbuffer
+{
+public:
+  float h;
+  float t;
+  int count;
+};
+
+Dhtbuffer dhtbuffer;
 Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
@@ -66,7 +76,7 @@ void disp_data(void)
 }
 void status()
 {
-  StaticJsonDocument<500> doc;
+  StaticJsonDocument<1000> doc;
 
   for (int i = 0; i < ioport; i++)
   {
@@ -77,8 +87,8 @@ void status()
     o["delay"] = ports[i].delay;
   }
 
-  char jsonChar[500];
-  serializeJsonPretty(doc, jsonChar, 500);
+  char jsonChar[1000];
+  serializeJsonPretty(doc, jsonChar, 1000);
   server.send(200, "application/json", jsonChar);
 }
 void setclosetime()
@@ -138,6 +148,18 @@ void readDHT()
 }
 void checkin()
 {
+  int connectcount = 0;
+  while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
+  {
+    delay(500);
+    Serial.print(".");
+    connectcount++;
+    if (connectcount >= 20)
+    {
+      if (!WiFi.reconnect())
+        ESP.restart();
+    }
+  }
   busy = true;
   StaticJsonDocument<500> doc;
 
@@ -221,16 +243,23 @@ int getPort(String p)
 
 void DHTtoJSON()
 {
+  Serial.println("Read DHT");
   digitalWrite(b_led, LOW);
-  readDHT();
+
+  if (dhtbuffer.count <= 0)
+  {
+    readDHT();
+    dhtbuffer.count = 60;
+  }
   digitalWrite(b_led, HIGH);
   StaticJsonDocument<500> doc;
   doc["t"] = pfTemp;
   doc["h"] = pfHum;
   doc["ip"] = WiFi.macAddress();
-  char jsonChar[100];
-  serializeJsonPretty(doc, jsonChar, 100);
+  char jsonChar[500];
+  serializeJsonPretty(doc, jsonChar, 500);
   server.send(200, "application/json", jsonChar);
+  Serial.println("End read dht");
 }
 void addTorun(int port, int delay, int value, int wait)
 {
@@ -299,7 +328,7 @@ void flip()
 {
   int state = digitalRead(b_led); // get the current state of GPIO1 pin
   digitalWrite(b_led, !state);    // set pin to the opposite state
-
+  dhtbuffer.count--;
   for (int i = 0; i < ioport; i++)
   {
     //  Serial.println("Check port " + ports[i].port);
@@ -371,11 +400,12 @@ void setup()
   disp_data();
 #endif
 
-  t.every(60000, checkin);
+  t.every(600000, checkin);
   flipper.attach(1, flip);
   dht.begin();
 }
-
+const IPAddress remote_ip(192, 168, 88, 70);
+int pingcount = 0;
 void loop()
 {
   server.handleClient();
@@ -387,8 +417,22 @@ void loop()
 
   // put your main code here, to run repeatedly:
 
-  if (!WiFiMulti.run() == WL_CONNECTED)
-  {
-    WiFi.reconnect();
-  }
+  // if (!WiFiMulti.run() == WL_CONNECTED)
+  // {
+  //   WiFi.reconnect();
+  // }
+  // if (!Ping.ping(remote_ip))
+  // {
+
+  //   pingcount++;
+  //   if (pingcount > 100)
+  //   {
+  //     //  ESP.restart();
+  //     if (!WiFi.reconnect())
+  //     {
+  //       ESP.restart();
+  //     }
+  //   }
+  //   delay(200);
+  // }
 }
