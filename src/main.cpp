@@ -16,6 +16,7 @@
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
+String name = "18";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
@@ -60,57 +61,6 @@ public:
 };
 
 Portio ports[ioport];
-
-void disp_data(void)
-{
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_CENTER);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(20, 1, "D1 io ");
-  display.drawString(80, 1, "IP" + WiFi.localIP().toString());
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(1, 20, "H:");
-
-  display.display();
-}
-void status()
-{
-  StaticJsonDocument<1000> doc;
-
-  for (int i = 0; i < ioport; i++)
-  {
-
-    JsonObject o = doc.createNestedObject(new String(i));
-    o["port"] = ports[i].port;
-    o["closetime"] = ports[i].closetime;
-    o["delay"] = ports[i].delay;
-  }
-
-  char jsonChar[1000];
-  serializeJsonPretty(doc, jsonChar, 1000);
-  server.send(200, "application/json", jsonChar);
-}
-void setclosetime()
-{
-
-  int s = server.arg("time").toInt();
-  // timetocount = s;
-  digitalWrite(D5, 1);
-
-  String closetime = server.arg("closetime");
-  ports[2].delay = s;
-  ports[2].value = 1;
-  ports[2].closetime = closetime;
-  StaticJsonDocument<500> doc;
-
-  doc["run"] = "ok";
-  doc["countime"] = s;
-  doc["closeat"] = closetime;
-  char jsonChar[100];
-  serializeJsonPretty(doc, jsonChar, 100);
-  server.send(200, "application/json", jsonChar);
-}
 void readDHT()
 {
 
@@ -146,6 +96,63 @@ void readDHT()
 
   // tempC = sensors.getTempC(t);
 }
+void disp_data(void)
+{
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(20, 1, "D1 io ");
+  display.drawString(80, 1, "IP" + WiFi.localIP().toString());
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(1, 20, "H:");
+
+  display.display();
+}
+void status()
+{
+  StaticJsonDocument<1000> doc;
+
+  for (int i = 0; i < ioport; i++)
+  {
+
+    JsonObject o = doc.createNestedObject(new String(i));
+    o["port"] = ports[i].port;
+    o["closetime"] = ports[i].closetime;
+    o["delay"] = ports[i].delay;
+  }
+  doc["name"] =name;
+  doc["ip"]=WiFi.localIP().toString();
+  doc["mac"]=WiFi.macAddress();
+  doc["ssid"]=WiFi.SSID();
+  readDHT();
+  doc["h"] = pfHum;
+  doc["t"] = pfTemp;
+  char jsonChar[1000];
+  serializeJsonPretty(doc, jsonChar, 1000);
+  server.send(200, "application/json", jsonChar);
+}
+void setclosetime()
+{
+
+  int s = server.arg("time").toInt();
+  // timetocount = s;
+  digitalWrite(D5, 1);
+
+  String closetime = server.arg("closetime");
+  ports[2].delay = s;
+  ports[2].value = 1;
+  ports[2].closetime = closetime;
+  StaticJsonDocument<500> doc;
+
+  doc["run"] = "ok";
+  doc["countime"] = s;
+  doc["closeat"] = closetime;
+  char jsonChar[100];
+  serializeJsonPretty(doc, jsonChar, 100);
+  server.send(200, "application/json", jsonChar);
+}
+
 void checkin()
 {
   int connectcount = 0;
@@ -370,7 +377,7 @@ void setup()
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   // connect();
-  // WiFiMulti.addAP("Sirifarm", "0932154741");
+  WiFiMulti.addAP("Sirifarm", "0932154741");
   // WiFiMulti.addAP("pksy", "04qwerty");
   // WiFiMulti.addAP("SP", "04qwerty");
   // WiFiMulti.addAP("ky_MIFI", "04qwerty");
