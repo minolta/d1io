@@ -121,10 +121,10 @@ void status()
     o["closetime"] = ports[i].closetime;
     o["delay"] = ports[i].delay;
   }
-  doc["name"] =name;
-  doc["ip"]=WiFi.localIP().toString();
-  doc["mac"]=WiFi.macAddress();
-  doc["ssid"]=WiFi.SSID();
+  doc["name"] = name;
+  doc["ip"] = WiFi.localIP().toString();
+  doc["mac"] = WiFi.macAddress();
+  doc["ssid"] = WiFi.SSID();
   readDHT();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
@@ -169,18 +169,10 @@ void checkin()
   }
   busy = true;
   StaticJsonDocument<500> doc;
-
   doc["mac"] = WiFi.macAddress();
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
-  // JSONencoder["t"] = pfTemp;
-  // JSONencoder["h"] = pfHum;
-  // JsonObject &dht = JSONencoder.createNestedObject("dhtvalue");
-  //  dht["t"] = pfTemp;
-  // dht["h"] = pfHum;
-
   char JSONmessageBuffer[300];
-  // JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
   serializeJsonPretty(doc, JSONmessageBuffer, 300);
   Serial.println(JSONmessageBuffer);
   // put your main code here, to run repeatedly:
@@ -283,11 +275,6 @@ void addTorun(int port, int delay, int value, int wait)
       ports[i].run = 1;
       digitalWrite(ports[i].port, value);
       Serial.println("Set port");
-      // }
-      // else
-      // {
-      //   Serial.println("this port running");
-      // }
     }
   }
 }
@@ -365,8 +352,6 @@ void setup()
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
   pinMode(b_led, OUTPUT);
-  // pinMode(D3, INPUT);
-  // pinMode(D4, INPUT);
   pinMode(D5, OUTPUT);
   pinMode(D6, OUTPUT);
   pinMode(D7, OUTPUT);
@@ -376,12 +361,7 @@ void setup()
   WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
-  // connect();
   WiFiMulti.addAP("Sirifarm", "0932154741");
-  // WiFiMulti.addAP("pksy", "04qwerty");
-  // WiFiMulti.addAP("SP", "04qwerty");
-  // WiFiMulti.addAP("ky_MIFI", "04qwerty");
-  // WiFiMulti.addAP("SP3", "04qwerty");
 
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
@@ -411,35 +391,8 @@ void setup()
   flipper.attach(1, flip);
   dht.begin();
 }
-const IPAddress remote_ip(192, 168, 88, 70);
-int pingcount = 0;
 void loop()
 {
   server.handleClient();
   t.update();
-  // digitalWrite(b_led, 0);
-  // delay(500);
-  // digitalWrite(b_led, 1);
-  // delay(500);
-
-  // put your main code here, to run repeatedly:
-
-  // if (!WiFiMulti.run() == WL_CONNECTED)
-  // {
-  //   WiFi.reconnect();
-  // }
-  // if (!Ping.ping(remote_ip))
-  // {
-
-  //   pingcount++;
-  //   if (pingcount > 100)
-  //   {
-  //     //  ESP.restart();
-  //     if (!WiFi.reconnect())
-  //     {
-  //       ESP.restart();
-  //     }
-  //   }
-  //   delay(200);
-  // }
 }
