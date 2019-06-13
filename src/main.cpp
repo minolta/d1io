@@ -17,6 +17,7 @@
 // #define useI2C 1
 #define ioport 7
 String name = "18";
+const String version = "1";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
@@ -95,6 +96,24 @@ void readDHT()
   }
 
   // tempC = sensors.getTempC(t);
+}
+
+void ota()
+{
+  t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1io/" + version, version);
+  // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
+  switch (ret)
+  {
+  case HTTP_UPDATE_FAILED:
+    Serial.println("[update] Update failed.");
+    break;
+  case HTTP_UPDATE_NO_UPDATES:
+    Serial.println("[update] Update no Update.");
+    break;
+  case HTTP_UPDATE_OK:
+    Serial.println("[update] Update ok."); // may not called we reboot the ESP
+    break;
+  }
 }
 void disp_data(void)
 {
@@ -191,6 +210,7 @@ void checkin()
 
   http.end(); //Close connection
   busy = false;
+  ota();
 }
 void setport()
 {
@@ -345,6 +365,7 @@ void flip()
       ports[i].run = 0;
   }
 }
+
 void setup()
 {
   Serial.begin(9600);
