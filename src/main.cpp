@@ -383,6 +383,7 @@ void setup()
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   WiFiMulti.addAP("Sirifarm", "0932154741");
+  WiFiMulti.addAP("test", "12345678");
 
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
