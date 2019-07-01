@@ -16,8 +16,8 @@
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
-String name = "18";
-const String version = "1";
+String name = "d1io";
+const String version = "6";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
@@ -100,7 +100,7 @@ void readDHT()
 
 void ota()
 {
-  t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1io/" + version, version);
+  t_httpUpdate_return ret = ESPhttpUpdate.update("fw-dot-kykub-2.appspot.com", 80, "/espupdate/d1io/" + version, version);
   // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   switch (ret)
   {
@@ -144,6 +144,7 @@ void status()
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
   doc["ssid"] = WiFi.SSID();
+  doc["version"] = version;
   readDHT();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
@@ -197,7 +198,7 @@ void checkin()
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
 
-  http.begin("http://endpoint.pixka.me:8081/checkin"); //Specify request destination
+  http.begin("http://pi-dot-kykub-2.appspot.com/checkin"); //Specify request destination
   http.addHeader("Content-Type", "application/json");  //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
@@ -323,7 +324,7 @@ void run()
   doc["ip"] = WiFi.localIP().toString();
   char jsonChar[500];
   serializeJsonPretty(doc, jsonChar, 500);
-  server.send(200, "applic ation/json", jsonChar);
+  server.send(200, "application/json", jsonChar);
   // delay(d.toInt() * 1000);
   // digitalWrite(port, !value);
   // delay(w.toInt() * 1000);
@@ -409,7 +410,7 @@ void setup()
   disp_data();
 #endif
 
-  t.every(600000, checkin);
+  t.every(60000, checkin);
   flipper.attach(1, flip);
   dht.begin();
 }
