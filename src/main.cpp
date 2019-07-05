@@ -17,7 +17,7 @@
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-const String version = "6";
+const String version = "11";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
@@ -57,6 +57,7 @@ public:
   int waittime;
   int run = 0;
   String closetime;
+  String name;
   Portio *n;
   Portio *p;
 };
@@ -130,12 +131,13 @@ void disp_data(void)
 }
 void status()
 {
-  StaticJsonDocument<1000> doc;
 
+  StaticJsonDocument<1000> doc;
+  JsonObject portsobj = doc.createNestedObject("ports");
   for (int i = 0; i < ioport; i++)
   {
 
-    JsonObject o = doc.createNestedObject(new String(i));
+    JsonObject o = portsobj.createNestedObject(new String(i));
     o["port"] = ports[i].port;
     o["closetime"] = ports[i].closetime;
     o["delay"] = ports[i].delay;
@@ -150,6 +152,10 @@ void status()
   doc["t"] = pfTemp;
   char jsonChar[1000];
   serializeJsonPretty(doc, jsonChar, 1000);
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // 'Access-Control-Allow-Headers':'application/json'
   server.send(200, "application/json", jsonChar);
 }
 void setclosetime()
@@ -199,15 +205,22 @@ void checkin()
   HTTPClient http; //Declare object of class HTTPClient
 
   http.begin("http://pi-dot-kykub-2.appspot.com/checkin"); //Specify request destination
-  http.addHeader("Content-Type", "application/json");  //Specify content-type header
+  http.addHeader("Content-Type", "application/json");      //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
   int httpCode = http.POST(JSONmessageBuffer); //Send the request
   String payload = http.getString();           //Get the response payload
   Serial.print(" Http Code:");
   Serial.println(httpCode); //Print HTTP return code
-  Serial.print(" Play load:");
-  Serial.println(payload); //Print request response payload
+  if (httpCode == 200)
+  {
+    Serial.print(" Play load:");
+    Serial.println(payload); //Print request response payload
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+    JsonObject obj = doc.as<JsonObject>();
+    name = obj["pidevice"]["name"].as<String>();
+  }
 
   http.end(); //Close connection
   busy = false;
@@ -216,12 +229,23 @@ void checkin()
 void setport()
 {
   ports[0].port = D1;
+  ports[0].name = "D1";
   ports[1].port = D2;
+  ports[1].name = "D2";
+
   ports[2].port = D5;
+  ports[2].name = "D5";
+
   ports[3].port = D6;
+  ports[3].name = "D6";
+
   ports[4].port = D7;
+  ports[4].name = "D7";
+
   ports[5].port = D8;
-  ports[6].port = D3;
+  ports[5].name = "D8";
+
+  // ports[6].port = D3;
 }
 int getPort(String p)
 {
@@ -386,10 +410,17 @@ void setup()
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
 
+  int co = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
     delay(500);
+
     Serial.print(".");
+    co++;
+    if (co > 40)
+    {
+      ESP.restart();
+    }
   }
 
   Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
@@ -400,7 +431,8 @@ void setup()
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
   server.on("/setclosetime", setclosetime);
-
+  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   //  server.on("/info", info);
   server.begin(); //เปิด TCP Server
   Serial.println("Server started");
