@@ -17,7 +17,7 @@
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-const String version = "11";
+const String version = "12";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 SSD1306 display(0x3C, RX, TX);
@@ -101,7 +101,7 @@ void readDHT()
 
 void ota()
 {
-  t_httpUpdate_return ret = ESPhttpUpdate.update("fw-dot-kykub-2.appspot.com", 80, "/espupdate/d1io/" + version, version);
+  t_httpUpdate_return ret = ESPhttpUpdate.update("fw1.pixka.me", 8080, "/espupdate/d1io/" + version, version);
   // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   switch (ret)
   {
