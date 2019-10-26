@@ -20,7 +20,7 @@ String name = "d1io";
 const String version = "12";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
-String hosttraget = "";
+String hosttraget = "fw1.pixka.me:2222";
 SSD1306 display(0x3C, RX, TX);
 
 class Dhtbuffer
@@ -204,9 +204,9 @@ void checkin()
   Serial.println(JSONmessageBuffer);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
-  String h = "http://"+hosttraget+"/checkin";
-  http.begin(h); //Specify request destination
-  http.addHeader("Content-Type", "application/json");      //Specify content-type header
+  String h = "http://" + hosttraget + "/checkin";
+  http.begin(h);                                      //Specify request destination
+  http.addHeader("Content-Type", "application/json"); //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
   int httpCode = http.POST(JSONmessageBuffer); //Send the request
@@ -221,7 +221,6 @@ void checkin()
     deserializeJson(doc, payload);
     JsonObject obj = doc.as<JsonObject>();
     name = obj["pidevice"]["name"].as<String>();
-    
   }
 
   http.end(); //Close connection
@@ -412,6 +411,7 @@ void setup()
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
   WiFiMulti.addAP("farm", "12345678");
+  WiFiMulti.addAP("pksy", "04qwerty");
 
   int co = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
