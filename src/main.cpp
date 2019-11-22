@@ -9,18 +9,29 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266httpUpdate.h>
-#include "Timer.h"
+// #include "Timer.h"
 #include <Ticker.h>
 #include <Wire.h>
 #include "SSD1306.h"
+long uptime = 0;
+long otatime = 0;
+long checkintime = 0;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
-#define ioport 7
+#define ioport 7 
 String name = "d1io";
-const String version = "12";
+const String version = "43";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
+// String hosttraget = "192.168.88.9:2222";
 String hosttraget = "fw1.pixka.me:2222";
+// String otahost = "192.168.88.9";
+// String otahost = "192.168.21.100";
+String otahost = "fw1.pixka.me";
+String updateString = "/espupdate/d1io/"+version;
+
+//  String otahost = "";
+
 SSD1306 display(0x3C, RX, TX);
 
 class Dhtbuffer
@@ -36,7 +47,7 @@ Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
 ESP8266WebServer server(80);
-Timer t, t2;
+// Timer t, t2;
 boolean busy = false;
 int count = 0;
 #define DHTPIN D3 // Pin which is connected to the DHT sensor.
@@ -102,7 +113,8 @@ void readDHT()
 
 void ota()
 {
-  t_httpUpdate_return ret = ESPhttpUpdate.update("fw1.pixka.me", 8080, "/espupdate/d1io/" + version, version);
+  Serial.println("CALL "+otahost+" "+updateString);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(otahost, 8080, updateString, version);
   // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   switch (ret)
   {
@@ -130,6 +142,56 @@ void disp_data(void)
 
   display.display();
 }
+void trytoota()
+{
+  String re = "";
+  t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/1" );
+  // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
+  Serial.println(ret);
+  switch (ret)
+  {
+  case HTTP_UPDATE_FAILED:
+    Serial.println("[update] Update failed.");
+    re = "Update failed";
+    break;
+  case HTTP_UPDATE_NO_UPDATES:
+
+    Serial.println("[update] Update no Update.");
+    re = "No update";
+    break;
+  case HTTP_UPDATE_OK:
+    Serial.println("[update] Update ok."); // may not called we reboot the ESP
+    re = "update ok";
+    break;
+  }
+  StaticJsonDocument<1000> doc;
+  JsonObject portsobj = doc.createNestedObject("ports");
+  for (int i = 0; i < ioport; i++)
+  {
+
+    JsonObject o = portsobj.createNestedObject(new String(i));
+    o["port"] = ports[i].port;
+    o["closetime"] = ports[i].closetime;
+    o["delay"] = ports[i].delay;
+  }
+  doc["name"] = name;
+  doc["ip"] = WiFi.localIP().toString();
+  doc["mac"] = WiFi.macAddress();
+  doc["ssid"] = WiFi.SSID();
+  doc["version"] = version;
+  readDHT();
+  doc["h"] = pfHum;
+  doc["t"] = pfTemp;
+  doc["uptime"] = uptime;
+  doc["updateresult"] = re;
+  char jsonChar[1000];
+  serializeJsonPretty(doc, jsonChar, 1000);
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // 'Access-Control-Allow-Headers':'application/json'
+  server.send(200, "application/json", jsonChar);
+}
 void status()
 {
 
@@ -151,6 +213,7 @@ void status()
   readDHT();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
+  doc["uptime"] = uptime;
   char jsonChar[1000];
   serializeJsonPretty(doc, jsonChar, 1000);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -191,7 +254,8 @@ void checkin()
     if (connectcount >= 20)
     {
       if (!WiFi.reconnect())
-        ESP.restart();
+        // ESP.restart();
+        return;
     }
   }
   busy = true;
@@ -225,7 +289,7 @@ void checkin()
 
   http.end(); //Close connection
   busy = false;
-  ota();
+  // ota();
 }
 void setport()
 {
@@ -366,6 +430,9 @@ void ssid()
 }
 void flip()
 {
+  uptime++;
+  otatime++;
+  checkintime++;
   int state = digitalRead(b_led); // get the current state of GPIO1 pin
   digitalWrite(b_led, !state);    // set pin to the opposite state
   dhtbuffer.count--;
@@ -405,13 +472,14 @@ void setup()
   pinMode(D8, OUTPUT);
 
   setport();
-  WiFiMulti.addAP("forpi3", "04qwerty");
+  // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
   WiFiMulti.addAP("farm", "12345678");
   WiFiMulti.addAP("pksy", "04qwerty");
+  WiFiMulti.addAP("ky_MIFI", "04qwerty");
 
   int co = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
@@ -425,7 +493,8 @@ void setup()
       ESP.restart();
     }
   }
-
+  checkin();
+  ota();
   Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
   String mac = WiFi.macAddress();
   Serial.println(mac); // แสดงหมายเลข IP ของ Server
@@ -433,6 +502,8 @@ void setup()
   server.on("/ssid", ssid);
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
+  server.on("/ota", trytoota);
+
   server.on("/setclosetime", setclosetime);
   // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -445,12 +516,23 @@ void setup()
   disp_data();
 #endif
 
-  t.every(60000, checkin);
+  // t.every(60000, checkin);
   flipper.attach(1, flip);
   dht.begin();
 }
 void loop()
 {
   server.handleClient();
-  t.update();
+  // t.update();
+
+  if (checkintime > 600)
+  {
+    checkintime = 0;
+    checkin();
+  }
+  if (otatime > 60)
+  {
+    otatime = 0;
+    ota();
+  }
 }
