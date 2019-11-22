@@ -20,7 +20,7 @@ long checkintime = 0;
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-const String version = "44";
+const String version = "45";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
@@ -262,6 +262,7 @@ void checkin()
   doc["mac"] = WiFi.macAddress();
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
+  doc["uptime"]=uptime;
   char JSONmessageBuffer[300];
   serializeJsonPretty(doc, JSONmessageBuffer, 300);
   Serial.println(JSONmessageBuffer);
@@ -502,6 +503,7 @@ void setup()
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
   server.on("/ota", trytoota);
+  server.on("/",status);
 
   server.on("/setclosetime", setclosetime);
   // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
