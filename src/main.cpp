@@ -18,22 +18,18 @@ long otatime = 0;
 long checkintime = 0;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
-#define ioport 7 
+#define ioport 7
 String name = "d1io";
-const String version = "43";
+const String version = "44";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
 String hosttraget = "fw1.pixka.me:2222";
 // String otahost = "192.168.88.9";
-// String otahost = "192.168.21.100";
 String otahost = "fw1.pixka.me";
-String updateString = "/espupdate/d1io/"+version;
-
-//  String otahost = "";
-
+String updateString = "/espupdate/d1io/" + version;
 SSD1306 display(0x3C, RX, TX);
-
+String message = "";
 class Dhtbuffer
 {
 public:
@@ -113,16 +109,18 @@ void readDHT()
 
 void ota()
 {
-  Serial.println("CALL "+otahost+" "+updateString);
+  Serial.println("CALL " + otahost + " " + updateString);
   t_httpUpdate_return ret = ESPhttpUpdate.update(otahost, 8080, updateString, version);
   // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   switch (ret)
   {
   case HTTP_UPDATE_FAILED:
     Serial.println("[update] Update failed.");
+    message = "Update failed";
     break;
   case HTTP_UPDATE_NO_UPDATES:
     Serial.println("[update] Update no Update.");
+    message = "Device already updated";
     break;
   case HTTP_UPDATE_OK:
     Serial.println("[update] Update ok."); // may not called we reboot the ESP
@@ -145,7 +143,7 @@ void disp_data(void)
 void trytoota()
 {
   String re = "";
-  t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/1" );
+  t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/1");
   // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   Serial.println(ret);
   switch (ret)
@@ -214,6 +212,7 @@ void status()
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
+  doc["message"] = message;
   char jsonChar[1000];
   serializeJsonPretty(doc, jsonChar, 1000);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
