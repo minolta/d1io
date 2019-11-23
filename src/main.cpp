@@ -20,7 +20,7 @@ long checkintime = 0;
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-String version = "48";
+String version = "50";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
@@ -458,11 +458,8 @@ void flip()
       ports[i].run = 0;
   }
 }
-
-void setup()
+void setupport()
 {
-  Serial.begin(9600);
-  WiFi.mode(WIFI_STA);
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
   pinMode(b_led, OUTPUT);
@@ -470,6 +467,19 @@ void setup()
   pinMode(D6, OUTPUT);
   pinMode(D7, OUTPUT);
   pinMode(D8, OUTPUT);
+
+  digitalWrite(D1,0);
+  digitalWrite(D2,0);
+  digitalWrite(D5,0);
+  digitalWrite(D6,0);
+  digitalWrite(D7,0);
+  digitalWrite(D8,0);
+}
+void setup()
+{
+  Serial.begin(9600);
+  WiFi.mode(WIFI_STA);
+  
 
   setport();
   // WiFiMulti.addAP("forpi3", "04qwerty");
@@ -485,7 +495,7 @@ void setup()
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
     delay(500);
-
+    setupport();
     Serial.print(".");
     co++;
     if (co > 40)
