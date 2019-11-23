@@ -20,7 +20,7 @@ long checkintime = 0;
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-const String version = "45";
+String version = "48";
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
