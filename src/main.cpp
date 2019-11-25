@@ -3,8 +3,8 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
-#include <max6675.h>
-#include <ESP8266HTTPClient.h>
+// #include <max6675.h>
+// #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
@@ -12,15 +12,24 @@
 // #include "Timer.h"
 #include <Ticker.h>
 #include <Wire.h>
-#include "SSD1306.h"
+#include <EEPROM.h>
+#define ADDR 100
+
+// #include "SSD1306.h"
 long uptime = 0;
 long otatime = 0;
 long checkintime = 0;
+long timetoreaddht = 0;
+long porttrick = 0;
+long readdhttime = 0;
+int apmode = 0;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-String version = "50";
+String type = "D1IO";
+String version = "57";
+long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
@@ -28,7 +37,7 @@ String hosttraget = "fw1.pixka.me:2222";
 // String otahost = "192.168.88.9";
 String otahost = "fw1.pixka.me";
 String updateString = "/espupdate/d1io/" + version;
-SSD1306 display(0x3C, RX, TX);
+// SSD1306 display(0x3C, RX, TX);
 String message = "";
 class Dhtbuffer
 {
@@ -38,16 +47,26 @@ public:
   int count;
 };
 
+class Wifidata
+{
+public:
+  char ssid[50];
+  char password[50];
+};
+Wifidata wifidata;
+String p;
+String s;
+
 Dhtbuffer dhtbuffer;
 Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
+
 ESP8266WebServer server(80);
 // Timer t, t2;
 boolean busy = false;
 int count = 0;
-#define DHTPIN D3 // Pin which is connected to the DHT sensor.
-
+#define DHTPIN D3     // Pin which is connected to the DHT sensor.
 #define DHTTYPE DHT22 // DHT 22 (AM2302)
 DHT_Unified dht(DHTPIN, DHTTYPE);
 float pfDew, pfHum, pfTemp, pfVcc;
@@ -71,9 +90,31 @@ public:
 };
 
 Portio ports[ioport];
+// #include <ESPAsyncWebServer.h>
+// AsyncWebServer aserver(80);
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html><head>
+  <title>ESP WIFI </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head><body>
+  <form action="/get">
+    SSID: <input type="text" name="ssid">
+    PASSWORD: <input type="password" name="password">
+    <input type="submit" value="Submit">
+  </form><br>
+</body></html>)rawliteral";
+
+void setAPMode()
+{
+  String mac = WiFi.macAddress();
+  WiFi.softAP("ESP" + mac, "12345678");
+  IPAddress IP = WiFi.softAPIP();
+  Serial.println(IP.toString());
+  apmode = 1;
+}
 void readDHT()
 {
-
   // Delay between measurements.
   // delay(delayMS);
   // Get temperature event and print its value.
@@ -89,6 +130,8 @@ void readDHT()
     Serial.print(event.temperature);
     Serial.println(" *C");
     pfTemp = event.temperature;
+    dhtbuffer.t = pfTemp;
+    dhtbuffer.count = 120; //update buffer life time
   }
   // Get humidity event and print its value.
   dht.humidity().getEvent(&event);
@@ -102,6 +145,8 @@ void readDHT()
     Serial.print(event.relative_humidity);
     Serial.println("%");
     pfHum = event.relative_humidity;
+    dhtbuffer.h = pfHum;
+    dhtbuffer.count = 120; //update buffer life time
   }
 
   // tempC = sensors.getTempC(t);
@@ -127,19 +172,19 @@ void ota()
     break;
   }
 }
-void disp_data(void)
-{
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_CENTER);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(20, 1, "D1 io ");
-  display.drawString(80, 1, "IP" + WiFi.localIP().toString());
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(1, 20, "H:");
+// void disp_data(void)
+// {
+//   display.clear();
+//   display.setTextAlignment(TEXT_ALIGN_CENTER);
+//   display.setFont(ArialMT_Plain_10);
+//   display.drawString(20, 1, "D1 io ");
+//   display.drawString(80, 1, "IP" + WiFi.localIP().toString());
+//   display.setTextAlignment(TEXT_ALIGN_LEFT);
+//   display.setFont(ArialMT_Plain_16);
+//   display.drawString(1, 20, "H:");
 
-  display.display();
-}
+//   display.display();
+// }
 void trytoota()
 {
   String re = "";
@@ -177,7 +222,6 @@ void trytoota()
   doc["mac"] = WiFi.macAddress();
   doc["ssid"] = WiFi.SSID();
   doc["version"] = version;
-  readDHT();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
@@ -190,29 +234,55 @@ void trytoota()
   // 'Access-Control-Allow-Headers':'application/json'
   server.send(200, "application/json", jsonChar);
 }
+
+void get()
+{
+  String ssd = server.arg("ssid");
+  String password = server.arg("password");
+
+  Serial.print("SSD ");
+  Serial.println(ssd);
+  Serial.print("password ");
+  Serial.println(password);
+
+  if (ssd != NULL)
+    ssd.toCharArray(wifidata.ssid, 50);
+
+  if (password != NULL)
+    password.toCharArray(wifidata.password, 50);
+
+  Serial.println("Set ok");
+  EEPROM.put(ADDR, wifidata);
+  EEPROM.commit();
+  server.send(200, "application/json", "SSID" + ssd + " P:" + password);
+}
 void status()
 {
-
   StaticJsonDocument<1000> doc;
   JsonObject portsobj = doc.createNestedObject("ports");
-  for (int i = 0; i < ioport; i++)
-  {
 
-    JsonObject o = portsobj.createNestedObject(new String(i));
-    o["port"] = ports[i].port;
-    o["closetime"] = ports[i].closetime;
-    o["delay"] = ports[i].delay;
-  }
   doc["name"] = name;
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
   doc["ssid"] = WiFi.SSID();
   doc["version"] = version;
-  readDHT();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
   doc["message"] = message;
+  doc["dhtbuffer.time"] = dhtbuffer.count;
+  doc["porttrick"] = porttrick;
+  doc["counttime"] = counttime;
+  doc["savessid"] = wifidata.ssid;
+  doc["savepassword"] = wifidata.password;
+
+  for (int i = 0; i < ioport; i++)
+  {
+    JsonObject o = portsobj.createNestedObject(new String(i));
+    o["port"] = ports[i].port;
+    o["closetime"] = ports[i].closetime;
+    o["delay"] = ports[i].delay;
+  }
   char jsonChar[1000];
   serializeJsonPretty(doc, jsonChar, 1000);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -244,25 +314,22 @@ void setclosetime()
 
 void checkin()
 {
+
   int connectcount = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
     delay(500);
-    Serial.print(".");
+    Serial.print("#");
     connectcount++;
-    if (connectcount >= 20)
-    {
-      if (!WiFi.reconnect())
-        // ESP.restart();
-        return;
-    }
+    if (connectcount > 20)
+      return;
   }
   busy = true;
   StaticJsonDocument<500> doc;
   doc["mac"] = WiFi.macAddress();
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
-  doc["uptime"]=uptime;
+  doc["uptime"] = uptime;
   char JSONmessageBuffer[300];
   serializeJsonPretty(doc, JSONmessageBuffer, 300);
   Serial.println(JSONmessageBuffer);
@@ -358,7 +425,7 @@ void DHTtoJSON()
   if (dhtbuffer.count <= 0)
   {
     readDHT();
-    dhtbuffer.count = 60;
+    dhtbuffer.count = 120;
   }
   digitalWrite(b_led, HIGH);
   StaticJsonDocument<500> doc;
@@ -373,6 +440,8 @@ void DHTtoJSON()
 void addTorun(int port, int delay, int value, int wait)
 {
 
+  if (delay > counttime)
+    counttime = delay;
   for (int i = 0; i < ioport; i++)
   {
     if (ports[i].port == port)
@@ -419,6 +488,10 @@ void run()
   // delay(w.toInt() * 1000);
   // busy = false;
 }
+void setwifi()
+{
+  server.send(200, "text/html", index_html);
+}
 void ssid()
 {
   StaticJsonDocument<500> doc;
@@ -430,12 +503,21 @@ void ssid()
 }
 void flip()
 {
-  uptime++;
-  otatime++;
-  checkintime++;
-  int state = digitalRead(b_led); // get the current state of GPIO1 pin
-  digitalWrite(b_led, !state);    // set pin to the opposite state
+  uptime++;      //เวลา run
+  otatime++;     //เพิ่มการ update
+  checkintime++; //เพิ่มการนับ
+  porttrick++;   //บอกว่า 1 วิละ
+  readdhttime++; //บอกเวลา สำหรับอ่าน DHT
+
+  if (counttime > 0)
+    counttime--;
+
+  // get the current state of GPIO1 pin
+  digitalWrite(b_led, !digitalRead(b_led)); // set pin to the opposite state
   dhtbuffer.count--;
+}
+void portcheck()
+{
   for (int i = 0; i < ioport; i++)
   {
     //  Serial.println("Check port " + ports[i].port);
@@ -468,26 +550,80 @@ void setupport()
   pinMode(D7, OUTPUT);
   pinMode(D8, OUTPUT);
 
-  digitalWrite(D1,0);
-  digitalWrite(D2,0);
-  digitalWrite(D5,0);
-  digitalWrite(D6,0);
-  digitalWrite(D7,0);
-  digitalWrite(D8,0);
+  digitalWrite(D1, 0);
+  digitalWrite(D2, 0);
+  digitalWrite(D5, 0);
+  digitalWrite(D6, 0);
+  digitalWrite(D7, 0);
+  digitalWrite(D8, 0);
+}
+void reset()
+{
+  StaticJsonDocument<1000> doc;
+  JsonObject portsobj = doc.createNestedObject("ports");
+
+  doc["name"] = name;
+  doc["ip"] = WiFi.localIP().toString();
+  doc["mac"] = WiFi.macAddress();
+  doc["ssid"] = WiFi.SSID();
+  doc["version"] = version;
+  doc["h"] = pfHum;
+  doc["t"] = pfTemp;
+  doc["uptime"] = uptime;
+  doc["message"] = message;
+  doc["dhtbuffer.time"] = dhtbuffer.count;
+  doc["porttrick"] = porttrick;
+  doc["counttime"] = counttime;
+  doc["savessid"] = wifidata.ssid;
+  doc["savepassword"] = wifidata.password;
+  doc["reset"] = "OK";
+  for (int i = 0; i < ioport; i++)
+  {
+    JsonObject o = portsobj.createNestedObject(new String(i));
+    o["port"] = ports[i].port;
+    o["closetime"] = ports[i].closetime;
+    o["delay"] = ports[i].delay;
+  }
+  char jsonChar[1000];
+  serializeJsonPretty(doc, jsonChar, 1000);
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // 'Access-Control-Allow-Headers':'application/json'
+  server.send(200, "application/json", jsonChar);
+
+  ESP.restart();
 }
 void setup()
 {
+  EEPROM.begin(1000); // Use 1k for save value
   Serial.begin(9600);
-  WiFi.mode(WIFI_STA);
-  
+  int r = EEPROM.read(0);
+  if (r != 99)
+  {
+    EEPROM.write(0, 99);
+    EEPROM.put(ADDR, wifidata);
+    EEPROM.commit();
+  }
+  else
+  {
+    EEPROM.get(ADDR, wifidata);
+  }
+  Serial.println();
+  Serial.println("-----------------------------------------------");
+  Serial.println(wifidata.ssid);
+  Serial.println(wifidata.password);
+  Serial.println("-----------------------------------------------");
+  WiFiMulti.addAP(wifidata.ssid, wifidata.password);
 
+  // WiFi.mode(WIFI_STA);
   setport();
   // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
-  WiFiMulti.addAP("Sirifarm", "0932154741");
+  // WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
-  WiFiMulti.addAP("farm", "12345678");
+  // WiFiMulti.addAP("farm", "12345678");
   WiFiMulti.addAP("pksy", "04qwerty");
   WiFiMulti.addAP("ky_MIFI", "04qwerty");
 
@@ -498,36 +634,33 @@ void setup()
     setupport();
     Serial.print(".");
     co++;
-    if (co > 40)
+    if (co > 50)
     {
-      ESP.restart();
+      setAPMode();
+      break;
     }
   }
-  checkin();
-  ota();
-  Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
-  String mac = WiFi.macAddress();
-  Serial.println(mac); // แสดงหมายเลข IP ของ Server
+  if (!apmode)
+  {
+    checkin();
+    ota();
+    Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
+    String mac = WiFi.macAddress();
+    Serial.println(mac); // แสดงหมายเลข IP ของ Server
+  }
   server.on("/run", run);
   server.on("/ssid", ssid);
   server.on("/status", status);
   server.on("/dht", DHTtoJSON);
   server.on("/ota", trytoota);
-  server.on("/",status);
+  server.on("/setwifi", setwifi);
+  server.on("/get", get);
+  server.on("/", status);
+  server.on("/reset", reset);
 
   server.on("/setclosetime", setclosetime);
-  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  //  server.on("/info", info);
   server.begin(); //เปิด TCP Server
   Serial.println("Server started");
-#ifdef useI2C
-  display.init();
-  display.flipScreenVertically();
-  disp_data();
-#endif
-
-  // t.every(60000, checkin);
   flipper.attach(1, flip);
   dht.begin();
 }
@@ -535,15 +668,26 @@ void loop()
 {
   server.handleClient();
   // t.update();
-
-  if (checkintime > 600)
+  if (checkintime > 600 && counttime < 1)
   {
     checkintime = 0;
     checkin();
   }
-  if (otatime > 60)
+  if (otatime > 60 && counttime < 1)
   {
     otatime = 0;
     ota();
+  }
+  if (porttrick > 0 && counttime > 0)
+  {
+    porttrick = 0;
+    portcheck();
+  }
+
+  if (readdhttime > 120 && dhtbuffer.count < 1)
+  {
+    readdhttime = 0;
+    message = "Read DHT";
+    readDHT();
   }
 }
