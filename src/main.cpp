@@ -28,7 +28,7 @@ int apmode = 0;
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "57";
+String version = "58";
 long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
@@ -275,7 +275,7 @@ void status()
   doc["counttime"] = counttime;
   doc["savessid"] = wifidata.ssid;
   doc["savepassword"] = wifidata.password;
-
+  doc["otatime"] = otatime;
   for (int i = 0; i < ioport; i++)
   {
     JsonObject o = portsobj.createNestedObject(new String(i));
@@ -657,7 +657,6 @@ void setup()
   server.on("/get", get);
   server.on("/", status);
   server.on("/reset", reset);
-
   server.on("/setclosetime", setclosetime);
   server.begin(); //เปิด TCP Server
   Serial.println("Server started");
@@ -678,7 +677,7 @@ void loop()
     otatime = 0;
     ota();
   }
-  if (porttrick > 0 && counttime > 0)
+  if (porttrick > 0 && counttime >= 0)
   {
     porttrick = 0;
     portcheck();
