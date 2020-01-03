@@ -626,12 +626,12 @@ void setup()
   // WiFiMulti.addAP("farm", "12345678");
   WiFiMulti.addAP("pksy", "04qwerty");
   WiFiMulti.addAP("ky_MIFI", "04qwerty");
-
+   setupport();
   int co = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
     delay(500);
-    setupport();
+ 
     Serial.print(".");
     co++;
     if (co > 50)
