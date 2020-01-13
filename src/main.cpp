@@ -621,7 +621,7 @@ void setup()
   // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
-  // WiFiMulti.addAP("Sirifarm", "0932154741");
+  WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
   // WiFiMulti.addAP("farm", "12345678");
   WiFiMulti.addAP("pksy", "04qwerty");
