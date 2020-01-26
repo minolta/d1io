@@ -29,10 +29,10 @@ int apmode = 0;
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "61";
+String version = "62";
 extern "C"
 {
-#include "user_interface.h"
+#include "user_interface.h" 
 }
 long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
@@ -600,7 +600,7 @@ void reset()
   doc["savessid"] = wifidata.ssid;
   doc["savepassword"] = wifidata.password;
   doc["reset"] = "OK";
-  
+
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -631,7 +631,20 @@ void setup()
   Serial.println(wifidata.password);
   Serial.println("-----------------------------------------------");
   WiFiMulti.addAP(wifidata.ssid, wifidata.password);
+  int ft = 0;
+  while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
+  {
 
+    delay(500);
+    Serial.print("#");
+    ft++;
+    if (ft > 10)
+    {
+      Serial.println("Connect main wifi timeout");
+      apmode = 1;
+      break;
+    }
+  }
   // WiFi.mode(WIFI_STA);
   setport();
   // WiFiMulti.addAP("forpi3", "04qwerty");
@@ -656,11 +669,16 @@ void setup()
       break;
     }
   }
+
+  if (WiFiMulti.run() == WL_CONNECTED)
+  {
+    apmode = 0;
+  }
   if (!apmode)
   {
     ota();
     checkin();
-
+    WiFi.softAPdisconnect(true);
     Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
     String mac = WiFi.macAddress();
     Serial.println(mac); // แสดงหมายเลข IP ของ Server
@@ -691,6 +709,10 @@ void loop()
   }
   if (otatime > 60 && counttime < 1)
   {
+    if (WiFiMulti.run() == WL_CONNECTED)
+    {
+      WiFi.softAPdisconnect(true);
+    }
     otatime = 0;
     ota();
   }
