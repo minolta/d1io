@@ -29,10 +29,10 @@ int apmode = 0;
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "62";
+String version = "63";
 extern "C"
 {
-#include "user_interface.h" 
+#include "user_interface.h"
 }
 long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
@@ -272,6 +272,7 @@ void status()
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
   doc["ssid"] = WiFi.SSID();
+  doc["signal"] = WiFi.RSSI();
   doc["version"] = version;
   doc["freemem"] = system_get_free_heap_size();
   doc["h"] = pfHum;
