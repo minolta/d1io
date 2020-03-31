@@ -29,7 +29,7 @@ int apmode = 0;
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "63";
+String version = "65";
 extern "C"
 {
 #include "user_interface.h"
@@ -38,9 +38,9 @@ long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
-String hosttraget = "fw1.pixka.me:2222";
+String hosttraget = "pi3.pixka.me:2222";
 // String otahost = "192.168.88.9";
-String otahost = "fw1.pixka.me";
+String otahost = "pi3.pixka.me";
 String updateString = "/espupdate/d1io/" + version;
 // SSD1306 display(0x3C, RX, TX);
 String message = "";
