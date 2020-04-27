@@ -24,12 +24,13 @@ long timetoreaddht = 0;
 long porttrick = 0;
 long readdhttime = 0;
 int apmode = 0;
+int restarttime = 0;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "65";
+String version = "66";
 extern "C"
 {
 #include "user_interface.h"
@@ -44,6 +45,19 @@ String otahost = "pi3.pixka.me";
 String updateString = "/espupdate/d1io/" + version;
 // SSD1306 display(0x3C, RX, TX);
 String message = "";
+struct
+{
+  int readtmpvalue = 120;
+  int a0readtime = 120;
+  float va0 = 0.5;
+  float sensorvalue = 42.5;
+  boolean havedht = false;
+  boolean haveds = false;
+  boolean havea0 = false;
+  boolean havetorestart = false; //สำหรับบอกว่าถ้าติดต่อ wifi ไม่ได้ให้ restart
+  boolean havesht = false;
+  int restarttime = 360; // หน่วยเป็นวิ
+} configdata;
 class Dhtbuffer
 {
 public:
@@ -109,7 +123,106 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
+const char setupconfig[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML>
+<html>
+<style>
+    input[type=text],
+    select {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    input[type=password] {
+  width: 100%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  display: inline-block;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+    input[type=submit] {
+        width: 100%;
+        background-color: #4CAF50;
+        color: white;
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    input[type=submit]:hover {
+        background-color: #45a049;
+    }
+    
+    div {
+        border-radius: 5px;
+        background-color: #f2f2f2;
+        padding: 20px;
+    }
+</style>
+<script>
+</script>
 
+<head>
+    <title>ESP WIFI Config</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+
+<div>
+<h3>Set config</h3>
+    <form action="/setvalue">
+       Have<select id="cars" name="p">
+            <option value="havedht">Dht</option>
+            <option value="havesht">SHT</option>
+            <option value="haveds">DS</option>
+            <option value="havea0">A0</option>
+            <option value="havetorestart">Auto restart</option>
+          </select>
+
+        Set to<select name="value">
+            <option value="1">Enable</option>
+            <option value="0">Disable</option>
+          </select>
+        <input type="submit" value="Set">
+    </form>
+    <form action="/restart">
+        <input type="submit" value="Restart">
+    </form>
+
+
+    <form action="/get">
+    SSID: <input type="text" name="ssid">
+    PASSWORD: <input type="password" name="password">
+    <input type="submit" value="setwifi">
+  </form>
+
+
+
+   <form action="/setvalue">
+       Set value : <select id="cars" name="p">
+            <option value="sensorvalue">Sensor value</option>
+            <option value="restarttime">Restarttime value</option>
+            
+          </select>
+
+        Set to <input type="text" name="value">
+        <input type="submit" value="Set">
+    </form>
+    </div>
+    <br> contract ky@pixka.me
+</body>
+
+</html>
+)rawliteral";
 void setAPMode()
 {
   String mac = WiFi.macAddress();
@@ -177,19 +290,7 @@ void ota()
     break;
   }
 }
-// void disp_data(void)
-// {
-//   display.clear();
-//   display.setTextAlignment(TEXT_ALIGN_CENTER);
-//   display.setFont(ArialMT_Plain_10);
-//   display.drawString(20, 1, "D1 io ");
-//   display.drawString(80, 1, "IP" + WiFi.localIP().toString());
-//   display.setTextAlignment(TEXT_ALIGN_LEFT);
-//   display.setFont(ArialMT_Plain_16);
-//   display.drawString(1, 20, "H:");
 
-//   display.display();
-// }
 void trytoota()
 {
   String re = "";
@@ -212,17 +313,8 @@ void trytoota()
     re = "update ok";
     break;
   }
-  // StaticJsonDocument<1000> doc;
   doc.clear();
-  // JsonObject portsobj = doc.createNestedObject("ports");
-  // for (int i = 0; i < ioport; i++)
-  // {
 
-  //   JsonObject o = portsobj.createNestedObject(new String(i));
-  //   o["port"] = ports[i].port;
-  //   o["closetime"] = ports[i].closetime;
-  //   o["delay"] = ports[i].delay;
-  // }
   doc["name"] = name;
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
@@ -264,10 +356,7 @@ void get()
 }
 void status()
 {
-  // StaticJsonDocument<1000> doc;
   doc.clear();
-  // JsonObject portsobj = doc.createNestedObject("ports");
-
   doc["name"] = name;
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
@@ -303,12 +392,15 @@ void status()
   doc["D8value"] = digitalRead(D8);
   doc["D8closetime"] = ports[5].closetime;
   doc["D8delay"] = ports[5].delay;
+  doc["config.havetorestart"] = configdata.havetorestart;
+  doc["config.restarttime"] = configdata.restarttime;
+  doc["config.havedht"] = configdata.havedht;
+  doc["restarttime"] = restarttime;
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  // 'Access-Control-Allow-Headers':'application/json'
   server.send(200, "application/json", jsonChar);
 }
 void setclosetime()
@@ -449,7 +541,6 @@ void DHTtoJSON()
     dhtbuffer.count = 120;
   }
   digitalWrite(b_led, HIGH);
-  // StaticJsonDocument<500> doc;
   doc.clear();
   doc["t"] = pfTemp;
   doc["h"] = pfHum;
@@ -468,8 +559,6 @@ void addTorun(int port, int delay, int value, int wait)
   {
     if (ports[i].port == port)
     {
-      // if (!ports[i].run)
-      // {
       ports[i].value = value;
       ports[i].delay = delay;
       ports[i].waittime = wait;
@@ -490,12 +579,8 @@ void run()
   Serial.println("Port: " + p + " value : " + v + " delay: " + d);
   int value = v.toInt();
 
-  //int d = server.arg("delay").toInt();
   int port = getPort(p);
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
-  // digitalWrite(port, value);
-  // server.send(200, "application/json", "ok");
-  // StaticJsonDocument<500> doc;
   doc.clear();
   doc["status"] = "ok";
   doc["port"] = p;
@@ -506,10 +591,6 @@ void run()
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "application/json", jsonChar);
-  // delay(d.toInt() * 1000);
-  // digitalWrite(port, !value);
-  // delay(w.toInt() * 1000);
-  // busy = false;
 }
 void setwifi()
 {
@@ -517,7 +598,6 @@ void setwifi()
 }
 void ssid()
 {
-  // StaticJsonDocument<500> doc;
   doc.clear();
   doc["ssid"] = WiFi.SSID();
 
@@ -532,7 +612,7 @@ void flip()
   checkintime++; //เพิ่มการนับ
   porttrick++;   //บอกว่า 1 วิละ
   readdhttime++; //บอกเวลา สำหรับอ่าน DHT
-
+  restarttime++;
   if (counttime > 0)
     counttime--;
 
@@ -581,6 +661,61 @@ void setupport()
   digitalWrite(D7, 0);
   digitalWrite(D8, 0);
 }
+void setconfig()
+{
+  server.send(200, "text/html", setupconfig);
+}
+void setvalue()
+{
+  String v = server.arg("p");
+  String value = server.arg("value");
+  String value2 = server.arg("value2");
+  if (v.equals("va0"))
+  {
+    configdata.va0 = value.toFloat();
+  }
+  else if (v.equals("sensorvalue"))
+  {
+    configdata.sensorvalue = value.toFloat();
+  }
+  else if (v.equals("havedht"))
+  {
+    configdata.havedht = value.toInt();
+  }
+  else if (v.equals("haveds"))
+  {
+    configdata.haveds = value.toInt();
+  }
+  else if (v.equals("havea0"))
+  {
+    configdata.havea0 = value.toInt();
+  }
+  else if (v.equals("havetorestart"))
+  {
+    configdata.havetorestart = value.toInt();
+  }
+  else if (v.equals("havesht"))
+  {
+    configdata.havesht = value.toInt();
+  }
+  else if (v.equals("restarttime"))
+  {
+    configdata.restarttime = value.toInt();
+  }
+  EEPROM.put(ADDR + 100, configdata);
+  EEPROM.commit();
+
+  doc.clear();
+  status();
+  doc["message"] = "set value " + v + "TO " + value;
+  char jsonChar[jsonsize];
+  serializeJsonPretty(doc, jsonChar, jsonsize);
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // 'Access-Control-Allow-Headers':'application/json'
+  server.send(200, "application/json", jsonChar);
+}
 void reset()
 {
   // StaticJsonDocument<1000> doc;
@@ -611,6 +746,25 @@ void reset()
   server.send(200, "application/json", jsonChar);
   ESP.restart();
 }
+void setHttp()
+{
+  server.on("/run", run);
+  server.on("/ssid", ssid);
+  server.on("/status", status);
+  server.on("/dht", DHTtoJSON);
+  server.on("/ota", trytoota);
+  server.on("/update", trytoota);
+  server.on("/setwifi", setwifi);
+  server.on("/get", get);
+  server.on("/setconfig", setconfig);
+  server.on("/", status);
+  server.on("/reset", reset);
+  server.on("/restart", reset);
+  server.on("/setvalue", setvalue);
+  server.on("/setclosetime", setclosetime);
+  server.begin(); //เปิด TCP Server
+  Serial.println("Server started");
+}
 void setup()
 {
   EEPROM.begin(1000); // Use 1k for save value
@@ -620,12 +774,15 @@ void setup()
   {
     EEPROM.write(0, 99);
     EEPROM.put(ADDR, wifidata);
+    EEPROM.put(ADDR + 100, configdata);
     EEPROM.commit();
   }
   else
   {
     EEPROM.get(ADDR, wifidata);
+    EEPROM.get(ADDR + 100, configdata);
   }
+  setport();
   Serial.println();
   Serial.println("-----------------------------------------------");
   Serial.println(wifidata.ssid);
@@ -639,7 +796,7 @@ void setup()
     delay(500);
     Serial.print("#");
     ft++;
-    if (ft > 10)
+    if (ft > 30)
     {
       Serial.println("Connect main wifi timeout");
       apmode = 1;
@@ -647,7 +804,7 @@ void setup()
     }
   }
   // WiFi.mode(WIFI_STA);
-  setport();
+
   // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
@@ -684,20 +841,25 @@ void setup()
     String mac = WiFi.macAddress();
     Serial.println(mac); // แสดงหมายเลข IP ของ Server
   }
-  server.on("/run", run);
-  server.on("/ssid", ssid);
-  server.on("/status", status);
-  server.on("/dht", DHTtoJSON);
-  server.on("/ota", trytoota);
-  server.on("/setwifi", setwifi);
-  server.on("/get", get);
-  server.on("/", status);
-  server.on("/reset", reset);
-  server.on("/setclosetime", setclosetime);
-  server.begin(); //เปิด TCP Server
-  Serial.println("Server started");
+  setHttp();
   flipper.attach(1, flip);
   dht.begin();
+}
+void printIPAddressOfHost(const char *host)
+{
+  IPAddress resolvedIP;
+  if (!WiFi.hostByName(host, resolvedIP))
+  {
+    Serial.println("DNS lookup failed.  Count..." + String(configdata.restarttime));
+    Serial.flush();
+    // restarttime++; //เพิ่มขึ้น
+    if (restarttime > configdata.restarttime && configdata.havetorestart)
+      ESP.reset();
+  }
+  restarttime = 0; //ติดต่อได้ก็ reset ไปเลย
+  Serial.print(host);
+  Serial.print(" IP: ");
+  Serial.println(resolvedIP);
 }
 void loop()
 {
@@ -723,10 +885,15 @@ void loop()
     portcheck();
   }
 
-  if (readdhttime > 120 && dhtbuffer.count < 1)
+  if (configdata.havedht && readdhttime > 120 && dhtbuffer.count < 1)
   {
     readdhttime = 0;
     message = "Read DHT";
     readDHT();
+  }
+
+  if (configdata.havetorestart & restarttime > 60)
+  { //ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
+    printIPAddressOfHost("fw.pixka.me");
   }
 }
