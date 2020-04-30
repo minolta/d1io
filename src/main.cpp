@@ -30,7 +30,7 @@ int restarttime = 0;
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "66";
+String version = "67";
 extern "C"
 {
 #include "user_interface.h"
@@ -226,7 +226,7 @@ const char setupconfig[] PROGMEM = R"rawliteral(
 void setAPMode()
 {
   String mac = WiFi.macAddress();
-  WiFi.softAP("ESP-IO" + mac, "12345678");
+  WiFi.softAP("ESP-IO" + mac);
   IPAddress IP = WiFi.softAPIP();
   Serial.println(IP.toString());
   apmode = 1;
@@ -808,6 +808,8 @@ void setup()
   // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
+  WiFiMulti.addAP("forpi5", "04qwerty");
+  WiFiMulti.addAP("forpi4", "04qwerty");
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
   // WiFiMulti.addAP("farm", "12345678");
