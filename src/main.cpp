@@ -26,12 +26,13 @@ long porttrick = 0;
 long readdhttime = 0;
 int apmode = 0;
 int restarttime = 0;
+int apmodetimeout = 0;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "67";
+String version = "68";
 extern "C"
 {
 #include "user_interface.h"
@@ -614,6 +615,8 @@ void flip()
   porttrick++;   //บอกว่า 1 วิละ
   readdhttime++; //บอกเวลา สำหรับอ่าน DHT
   restarttime++;
+  if (apmode)
+    apmodetimeout++;
   if (counttime > 0)
     counttime--;
 
@@ -898,5 +901,10 @@ void loop()
   if (configdata.havetorestart & restarttime > 60)
   { //ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
     printIPAddressOfHost("fw.pixka.me");
+  }
+
+  if (apmodetimeout > 600)
+  {
+    ESP.restart();
   }
 }
