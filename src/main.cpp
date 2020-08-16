@@ -48,8 +48,8 @@ int canuseled = 1;
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
-String type = "D1IO";
-const String version = "73";
+const String type = "D1IO";
+const String version = "79";
 extern "C"
 {
 #include "user_interface.h"
@@ -142,106 +142,103 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
-const char setupconfig[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML>
-<html>
-<style>
-    input[type=text],
-    select {
-        width: 100%;
-        padding: 12px 20px;
-        margin: 8px 0;
-        display: inline-block;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-sizing: border-box;
-    }
-    input[type=password] {
-  width: 100%;
-  padding: 12px 20px;
-  margin: 8px 0;
-  display: inline-block;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-    input[type=submit] {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        padding: 14px 20px;
-        margin: 8px 0;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    input[type=submit]:hover {
-        background-color: #45a049;
-    }
-    
-    div {
-        border-radius: 5px;
-        background-color: #f2f2f2;
-        padding: 20px;
-    }
-</style>
-<script>
-</script>
+// const char setupconfig[] PROGMEM = R"rawliteral(
+// <!DOCTYPE HTML>
+// <html>
+// <style>
+//     input[type=text],
+//     select {
+//         width: 100%;
+//         padding: 12px 20px;
+//         margin: 8px 0;
+//         display: inline-block;
+//         border: 1px solid #ccc;
+//         border-radius: 4px;
+//         box-sizing: border-box;
+//     }
+//     input[type=password] {
+//   width: 100%;
+//   padding: 12px 20px;
+//   margin: 8px 0;
+//   display: inline-block;
+//   border: 1px solid #ccc;
+//   border-radius: 4px;
+//   box-sizing: border-box;
+// }
+//     input[type=submit] {
+//         width: 100%;
+//         background-color: #4CAF50;
+//         color: white;
+//         padding: 14px 20px;
+//         margin: 8px 0;
+//         border: none;
+//         border-radius: 4px;
+//         cursor: pointer;
+//     }
 
-<head>
-    <title>ESP WIFI Config</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
+//     input[type=submit]:hover {
+//         background-color: #45a049;
+//     }
 
-<body>
+//     div {
+//         border-radius: 5px;
+//         background-color: #f2f2f2;
+//         padding: 20px;
+//     }
+// </style>
+// <script>
+// </script>
 
-<div>
-<h3>Set config</h3>
-    <form action="/setvalue">
-       Have<select id="cars" name="p">
-            <option value="havedht">Dht</option>
-            <option value="havesht">SHT</option>
-            <option value="haveds">DS</option>
-            <option value="havea0">A0</option>
-            <option value="havetorestart">Auto restart</option>
-          </select>
+// <head>
+//     <title>ESP WIFI Config</title>
+//     <meta name="viewport" content="width=device-width, initial-scale=1">
+// </head>
 
-        Set to<select name="value">
-            <option value="1">Enable</option>
-            <option value="0">Disable</option>
-          </select>
-        <input type="submit" value="Set">
-    </form>
-    <form action="/restart">
-        <input type="submit" value="Restart">
-    </form>
+// <body>
 
+// <div>
+// <h3>Set config</h3>
+//     <form action="/setvalue">
+//        Have<select id="cars" name="p">
+//             <option value="havedht">Dht</option>
+//             <option value="havesht">SHT</option>
+//             <option value="haveds">DS</option>
+//             <option value="havea0">A0</option>
+//             <option value="havetorestart">Auto restart</option>
+//           </select>
 
-    <form action="/get">
-    SSID: <input type="text" name="ssid">
-    PASSWORD: <input type="password" name="password">
-    <input type="submit" value="setwifi">
-  </form>
+//         Set to<select name="value">
+//             <option value="1">Enable</option>
+//             <option value="0">Disable</option>
+//           </select>
+//         <input type="submit" value="Set">
+//     </form>
+//     <form action="/restart">
+//         <input type="submit" value="Restart">
+//     </form>
 
+//     <form action="/get">
+//     SSID: <input type="text" name="ssid">
+//     PASSWORD: <input type="password" name="password">
+//     <input type="submit" value="setwifi">
+//   </form>
 
+//    <form action="/setvalue">
+//        Set value : <select id="cars" name="p">
+//             <option value="sensorvalue">Sensor value</option>
+//             <option value="restarttime">Restarttime value</option>
 
-   <form action="/setvalue">
-       Set value : <select id="cars" name="p">
-            <option value="sensorvalue">Sensor value</option>
-            <option value="restarttime">Restarttime value</option>
-            
-          </select>
+//           </select>
 
-        Set to <input type="text" name="value">
-        <input type="submit" value="Set">
-    </form>
-    </div>
-    <br> contract ky@pixka.me
-</body>
+//         Set to <input type="text" name="value">
+//         <input type="submit" value="Set">
+//     </form>
+//     </div>
+//     <br> contract ky@pixka.me
+// </body>
 
-</html>
-)rawliteral";
+// </html>
+// )rawliteral";
 void setAPMode()
 {
   String mac = WiFi.macAddress();
@@ -386,7 +383,9 @@ void get()
   Serial.println("Set ok");
   EEPROM.put(ADDR, wifidata);
   EEPROM.commit();
-  server.send(200, "application/json", "SSID" + ssd + " P:" + password);
+  String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set WIFI TO " + ssd + " <h3><hr><a href='/setconfig'>back</a></html>";
+
+  server.send(200, "text/html", re);
 }
 void status()
 {
@@ -437,7 +436,6 @@ void status()
   doc["datetime"] = formattedDate;
   doc["date"] = dayStamp;
   doc["time"] = timeStamp;
-
 
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
@@ -619,6 +617,7 @@ void run()
 
   if (p.equals("test"))
   {
+    message = "test port ";
     canuseled = 0;
     for (int i = 0; i < 20; i++)
     {
@@ -644,6 +643,7 @@ void run()
   String d = server.arg("delay");
   String w = server.arg("wait");
   Serial.println("Port: " + p + " value : " + v + " delay: " + d);
+  message = String("run port ") + String(p) + String(" value") + String(" delay ") + String(d) + " " + timeClient.getFormattedDate();
   int value = v.toInt();
 
   int port = getPort(p);
@@ -733,7 +733,8 @@ void setupport()
 }
 void setconfig()
 {
-  server.send(200, "text/html", setupconfig);
+  String html = " <!DOCTYPE html> <style> table { font-family: \"Trebuchet MS\", Arial, Helvetica, sans-serif; border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } tr:nth-child(even) { background-color: #f2f2f2; } tr:hover { background-color: #ddd; } th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #4CAF50; color: white; } button { /* width: 100%; */ background-color: #4CAF50; color: white; padding: 10px 15px; /* margin: 8px 0; */ border: none; border-radius: 4px; cursor: pointer; } .button3 { background-color: #f44336; } </style> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">  <meta charset=\"UTF-8\"> </head> Config in " + String(name) + " version:" + String(version) + " SSID:" + WiFi.SSID() + "  Signel: " + String(WiFi.RSSI()) + "<table id=\"customres\"> <tr> <td>Parameter</td> <td>value</td> <td>Option</td> </tr> <tr> <td>DHT</td> <td>" + String(configdata.havedht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\" value=\"1\">Disable</button> </form> </td> </tr> <tr> <td>SHT</td> <td>" + String(configdata.havesht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>DS</td> <td>" + String(configdata.haveds) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>A0</td> <td>" + String(configdata.havea0) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Have to restart</td> <td>" + String(configdata.havetorestart) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Sensor value </td> <td>" + String(configdata.sensorvalue) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"sensorvalue\"> <input type=\"number\" name=\"value\" value=\"{{valuesesnsor}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> <tr> <td>Auto restart value </td> <td>" + String(configdata.restarttime) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"restarttime\"> <input type=\"number\" name=\"value\" value=\"{{valuerestarttime}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> </table> <hr> <form action=\"/get\"> <table> <tr> <td colspan=\"3\">WIFI information</td> </tr> <tr> <td>SSID</td> <td>" + String(wifidata.ssid) + "</td> <td><input type=\"text\" name=\"ssid\"></td> </tr> <tr> <td>PASSWORD</td> <td>********</td> <td><input type=\"password\" name=\"password\"></td> </tr> <tr> <td colspan=\"3\" align=\"right\"><button type=\"submit\">Set wifi</button></td> </tr> </table> </form> <form action=\"/restart\"> <button type=\"submit\" class=\"button3\" value=\"Restart\">Restart</button> </form> ky@pixka.me 2020 </html>";
+  server.send(200, "text/html", html);
 }
 void setvalue()
 {
@@ -775,16 +776,18 @@ void setvalue()
   EEPROM.put(ADDR + 100, configdata);
   EEPROM.commit();
 
-  doc.clear();
-  status();
-  doc["message"] = "set value " + v + "TO " + value;
-  char jsonChar[jsonsize];
-  serializeJsonPretty(doc, jsonChar, jsonsize);
-  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  // 'Access-Control-Allow-Headers':'application/json'
-  server.send(200, "application/json", jsonChar);
+  // doc.clear();
+  // status();
+  // doc["message"] = "set value " + v + "TO " + value;
+  // char jsonChar[jsonsize];
+  // serializeJsonPretty(doc, jsonChar, jsonsize);
+  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  // server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // // 'Access-Control-Allow-Headers':'application/json'
+  // server.send(200, "application/json", jsonChar);
+  String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set " + v + " TO " + value + " <h3><hr><a href='/setconfig'>back</a> <script type=\"text/JavaScript\"> redirectTime = \"1500\"; redirectURL = \"/setconfig\"; function timedRedirect() { setTimeout(\"location.href = redirectURL;\",redirectTime); } </script></html>";
+  server.send(200, "text/html", re);
 }
 void reset()
 {
@@ -903,6 +906,7 @@ void setup()
   if (WiFiMulti.run() == WL_CONNECTED)
   {
     apmode = 0;
+    message = String(" connect to :") + WiFi.SSID();
   }
   if (!apmode)
   {
