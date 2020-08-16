@@ -14,8 +14,24 @@
 #include <Ticker.h>
 #include <Wire.h>
 #include <EEPROM.h>
+
+// #include <NTPClient.h>
+// #include <WiFiUdp.h>
+// #define TIME_ZONE (+7)
+// WiFiUDP ntpUDP;
+// NTPClient timeClient(ntpUDP, "th.pool.ntp.org", 3600, 60000);
+
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+String formattedDate;
+String dayStamp;
+String timeStamp;
+
 #define ADDR 100
 #define jsonsize 1200
+
 StaticJsonDocument<jsonsize> doc;
 // #include "SSD1306.h"
 long uptime = 0;
@@ -27,12 +43,13 @@ long readdhttime = 0;
 int apmode = 0;
 int restarttime = 0;
 int apmodetimeout = 0;
+int canuseled = 1;
 // #include <ESP8266Ping.h>
 // #define useI2C 1
 #define ioport 7
 String name = "d1io";
 String type = "D1IO";
-String version = "68";
+const String version = "73";
 extern "C"
 {
 #include "user_interface.h"
@@ -41,9 +58,9 @@ long counttime = 0;
 // SSD1306 display(0x3C, D2, D1);
 //D2 = SDA  D1 = SCL
 // String hosttraget = "192.168.88.9:2222";
-String hosttraget = "pi3.pixka.me:2222";
+String hosttraget = "point.pixka.me:2222";
 // String otahost = "192.168.88.9";
-String otahost = "pi3.pixka.me";
+String otahost = "point.pixka.me";
 String updateString = "/espupdate/d1io/" + version;
 // SSD1306 display(0x3C, RX, TX);
 String message = "";
@@ -271,7 +288,22 @@ void readDHT()
 
   // tempC = sensors.getTempC(t);
 }
+void updateNTP()
+{
+  timeClient.update();
+  formattedDate = timeClient.getFormattedDate();
+  Serial.println(formattedDate);
 
+  // Extract date
+  int splitT = formattedDate.indexOf("T");
+  dayStamp = formattedDate.substring(0, splitT);
+  Serial.print("DATE: ");
+  Serial.println(dayStamp);
+  // Extract time
+  timeStamp = formattedDate.substring(splitT + 1, formattedDate.length() - 1);
+  Serial.print("HOUR: ");
+  Serial.println(timeStamp);
+}
 void ota()
 {
   Serial.println("CALL " + otahost + " " + updateString);
@@ -398,6 +430,15 @@ void status()
   doc["config.restarttime"] = configdata.restarttime;
   doc["config.havedht"] = configdata.havedht;
   doc["restarttime"] = restarttime;
+  doc["ntptime"] = timeClient.getFormattedTime();
+  doc["ntptimelong"] = timeClient.getEpochTime();
+  doc["type"] = type;
+  updateNTP();
+  doc["datetime"] = formattedDate;
+  doc["date"] = dayStamp;
+  doc["time"] = timeStamp;
+
+
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -575,6 +616,30 @@ void run()
   busy = true;
   Serial.println("Run");
   String p = server.arg("port");
+
+  if (p.equals("test"))
+  {
+    canuseled = 0;
+    for (int i = 0; i < 20; i++)
+    {
+      digitalWrite(2, !digitalRead(2));
+      delay(500);
+    }
+    canuseled = 1;
+    doc.clear();
+    doc["status"] = "ok";
+    doc["port"] = p;
+    doc["mac"] = WiFi.macAddress();
+    doc["ip"] = WiFi.localIP().toString();
+    doc["name"] = name;
+    doc["uptime"] = uptime;
+    doc["ntptime"] = timeClient.getFormattedTime();
+    doc["ntptimelong"] = timeClient.getEpochTime();
+    char jsonChar[jsonsize];
+    serializeJsonPretty(doc, jsonChar, jsonsize);
+    server.send(200, "application/json", jsonChar);
+    return;
+  }
   String v = server.arg("value");
   String d = server.arg("delay");
   String w = server.arg("wait");
@@ -621,7 +686,8 @@ void flip()
     counttime--;
 
   // get the current state of GPIO1 pin
-  digitalWrite(b_led, !digitalRead(b_led)); // set pin to the opposite state
+  if (canuseled)
+    digitalWrite(b_led, !digitalRead(b_led)); // set pin to the opposite state
   dhtbuffer.count--;
 }
 void portcheck()
@@ -850,6 +916,10 @@ void setup()
   setHttp();
   flipper.attach(1, flip);
   dht.begin();
+  timeClient.begin();
+  timeClient.setTimeOffset(25200); //Thailand +7 = 25200
+  // timeClient.setTimeOffset(TIME_ZONE * (60 * 60));
+  // timeClient.setUpdateInterval(300 * 1000);
 }
 void printIPAddressOfHost(const char *host)
 {
@@ -878,11 +948,15 @@ void loop()
   }
   if (otatime > 60 && counttime < 1)
   {
+
+    updateNTP();
     if (WiFiMulti.run() == WL_CONNECTED)
     {
       WiFi.softAPdisconnect(true);
     }
     otatime = 0;
+    // timeClient.forceUpdate();
+
     ota();
   }
   if (porttrick > 0 && counttime >= 0)
