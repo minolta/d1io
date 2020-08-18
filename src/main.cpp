@@ -49,7 +49,7 @@ int canuseled = 1;
 #define ioport 7
 String name = "d1io";
 const String type = "D1IO";
-const String version = "80";
+const String version = "83";
 extern "C"
 {
 #include "user_interface.h"
@@ -619,12 +619,6 @@ void run()
   {
     message = "test port ";
     canuseled = 0;
-    for (int i = 0; i < 20; i++)
-    {
-      digitalWrite(2, !digitalRead(2));
-      delay(500);
-    }
-    canuseled = 1;
     doc.clear();
     doc["status"] = "ok";
     doc["port"] = p;
@@ -637,6 +631,13 @@ void run()
     char jsonChar[jsonsize];
     serializeJsonPretty(doc, jsonChar, jsonsize);
     server.send(200, "application/json", jsonChar);
+    for (int i = 0; i < 40; i++)
+    {
+      digitalWrite(2, !digitalRead(2));
+      delay(200);
+    }
+    canuseled = 1;
+  
     return;
   }
   String v = server.arg("value");
