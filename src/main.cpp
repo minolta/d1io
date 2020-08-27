@@ -4,23 +4,13 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
-// #include <max6675.h>
-// #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266httpUpdate.h>
-// #include "Timer.h"
 #include <Ticker.h>
 #include <Wire.h>
 #include <EEPROM.h>
-
-// #include <NTPClient.h>
-// #include <WiFiUdp.h>
-// #define TIME_ZONE (+7)
-// WiFiUDP ntpUDP;
-// NTPClient timeClient(ntpUDP, "th.pool.ntp.org", 3600, 60000);
-
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 WiFiUDP ntpUDP;
@@ -33,7 +23,6 @@ String timeStamp;
 #define jsonsize 1200
 
 StaticJsonDocument<jsonsize> doc;
-// #include "SSD1306.h"
 long uptime = 0;
 long otatime = 0;
 long checkintime = 0;
@@ -44,12 +33,10 @@ int apmode = 0;
 int restarttime = 0;
 int apmodetimeout = 0;
 int canuseled = 1;
-// #include <ESP8266Ping.h>
-// #define useI2C 1
 #define ioport 7
 String name = "d1io";
 const String type = "D1IO";
-const String version = "83";
+const String version = "84";
 extern "C"
 {
 #include "user_interface.h"
@@ -414,15 +401,19 @@ void status()
   doc["D2closetime"] = ports[1].closetime;
   doc["D2delay"] = ports[1].delay;
   doc["D5value"] = digitalRead(D5);
+  doc["d5"] = digitalRead(D5);
   doc["D5closetime"] = ports[2].closetime;
   doc["D5delay"] = ports[2].delay;
   doc["D6value"] = digitalRead(D6);
+  doc["d6"]=digitalRead(D6);
   doc["D6closetime"] = ports[3].closetime;
   doc["D6delay"] = ports[3].delay;
   doc["D7value"] = digitalRead(D7);
+  doc["d7"]=digitalRead(D7);
   doc["D7closetime"] = ports[4].closetime;
   doc["D7delay"] = ports[4].delay;
   doc["D8value"] = digitalRead(D8);
+  doc["d8"]=digitalRead(D8);
   doc["D8closetime"] = ports[5].closetime;
   doc["D8delay"] = ports[5].delay;
   doc["config.havetorestart"] = configdata.havetorestart;
