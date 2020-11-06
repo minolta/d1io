@@ -33,10 +33,14 @@ int apmode = 0;
 int restarttime = 0;
 int apmodetimeout = 0;
 int canuseled = 1;
+long load = 0;
+long loadcount = 0;
+double loadav = 0;
+double loadtotal = 0;
 #define ioport 7
 String name = "d1io";
 const String type = "D1IO";
-const String version = "84";
+const String version = "86";
 extern "C"
 {
 #include "user_interface.h"
@@ -395,9 +399,11 @@ void status()
   doc["savepassword"] = wifidata.password;
   doc["otatime"] = otatime;
   doc["D1value"] = digitalRead(D1);
+  doc["d1"] = digitalRead(D1);
   doc["D1closetime"] = ports[0].closetime;
   doc["D1delay"] = ports[0].delay;
   doc["D2value"] = digitalRead(D2);
+  doc["d2"] = digitalRead(D2);
   doc["D2closetime"] = ports[1].closetime;
   doc["D2delay"] = ports[1].delay;
   doc["D5value"] = digitalRead(D5);
@@ -405,15 +411,15 @@ void status()
   doc["D5closetime"] = ports[2].closetime;
   doc["D5delay"] = ports[2].delay;
   doc["D6value"] = digitalRead(D6);
-  doc["d6"]=digitalRead(D6);
+  doc["d6"] = digitalRead(D6);
   doc["D6closetime"] = ports[3].closetime;
   doc["D6delay"] = ports[3].delay;
   doc["D7value"] = digitalRead(D7);
-  doc["d7"]=digitalRead(D7);
+  doc["d7"] = digitalRead(D7);
   doc["D7closetime"] = ports[4].closetime;
   doc["D7delay"] = ports[4].delay;
   doc["D8value"] = digitalRead(D8);
-  doc["d8"]=digitalRead(D8);
+  doc["d8"] = digitalRead(D8);
   doc["D8closetime"] = ports[5].closetime;
   doc["D8delay"] = ports[5].delay;
   doc["config.havetorestart"] = configdata.havetorestart;
@@ -427,6 +433,8 @@ void status()
   doc["datetime"] = formattedDate;
   doc["date"] = dayStamp;
   doc["time"] = timeStamp;
+  doc["load"] = load;
+  doc["loadav"] = loadav;
 
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
@@ -584,7 +592,6 @@ void DHTtoJSON()
 }
 void addTorun(int port, int delay, int value, int wait)
 {
-
   if (delay > counttime)
     counttime = delay;
   for (int i = 0; i < ioport; i++)
@@ -628,7 +635,7 @@ void run()
       delay(200);
     }
     canuseled = 1;
-  
+
     return;
   }
   String v = server.arg("value");
@@ -647,6 +654,7 @@ void run()
   doc["value"] = value;
   doc["mac"] = WiFi.macAddress();
   doc["ip"] = WiFi.localIP().toString();
+  doc["uptime"]=uptime;
   char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "application/json", jsonChar);
@@ -779,16 +787,6 @@ void setvalue()
   EEPROM.put(ADDR + 100, configdata);
   EEPROM.commit();
 
-  // doc.clear();
-  // status();
-  // doc["message"] = "set value " + v + "TO " + value;
-  // char jsonChar[jsonsize];
-  // serializeJsonPretty(doc, jsonChar, jsonsize);
-  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  // server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  // // 'Access-Control-Allow-Headers':'application/json'
-  // server.send(200, "application/json", jsonChar);
   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set " + v + " TO " + value + " <h3><hr><a href='/setconfig'>back</a> <script type=\"text/JavaScript\"> redirectTime = \"1500\"; redirectURL = \"/setconfig\"; function timedRedirect() { setTimeout(\"location.href = redirectURL;\",redirectTime); } </script></html>";
   server.send(200, "text/html", re);
 }
@@ -946,6 +944,7 @@ void printIPAddressOfHost(const char *host)
 }
 void loop()
 {
+  long s = millis();
   server.handleClient();
   // t.update();
   if (checkintime > 600 && counttime < 1)
@@ -988,4 +987,9 @@ void loop()
   {
     ESP.restart();
   }
+
+  load = millis() - s;
+  loadcount++;
+  loadtotal += load;
+  loadav = loadtotal / loadcount;
 }
