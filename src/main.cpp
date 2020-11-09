@@ -14,7 +14,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP8266Ping.h>
-const String version = "88";
+const String version = "89";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -138,103 +138,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
-// const char setupconfig[] PROGMEM = R"rawliteral(
-// <!DOCTYPE HTML>
-// <html>
-// <style>
-//     input[type=text],
-//     select {
-//         width: 100%;
-//         padding: 12px 20px;
-//         margin: 8px 0;
-//         display: inline-block;
-//         border: 1px solid #ccc;
-//         border-radius: 4px;
-//         box-sizing: border-box;
-//     }
-//     input[type=password] {
-//   width: 100%;
-//   padding: 12px 20px;
-//   margin: 8px 0;
-//   display: inline-block;
-//   border: 1px solid #ccc;
-//   border-radius: 4px;
-//   box-sizing: border-box;
-// }
-//     input[type=submit] {
-//         width: 100%;
-//         background-color: #4CAF50;
-//         color: white;
-//         padding: 14px 20px;
-//         margin: 8px 0;
-//         border: none;
-//         border-radius: 4px;
-//         cursor: pointer;
-//     }
 
-//     input[type=submit]:hover {
-//         background-color: #45a049;
-//     }
-
-//     div {
-//         border-radius: 5px;
-//         background-color: #f2f2f2;
-//         padding: 20px;
-//     }
-// </style>
-// <script>
-// </script>
-
-// <head>
-//     <title>ESP WIFI Config</title>
-//     <meta name="viewport" content="width=device-width, initial-scale=1">
-// </head>
-
-// <body>
-
-// <div>
-// <h3>Set config</h3>
-//     <form action="/setvalue">
-//        Have<select id="cars" name="p">
-//             <option value="havedht">Dht</option>
-//             <option value="havesht">SHT</option>
-//             <option value="haveds">DS</option>
-//             <option value="havea0">A0</option>
-//             <option value="havetorestart">Auto restart</option>
-//           </select>
-
-//         Set to<select name="value">
-//             <option value="1">Enable</option>
-//             <option value="0">Disable</option>
-//           </select>
-//         <input type="submit" value="Set">
-//     </form>
-//     <form action="/restart">
-//         <input type="submit" value="Restart">
-//     </form>
-
-//     <form action="/get">
-//     SSID: <input type="text" name="ssid">
-//     PASSWORD: <input type="password" name="password">
-//     <input type="submit" value="setwifi">
-//   </form>
-
-//    <form action="/setvalue">
-//        Set value : <select id="cars" name="p">
-//             <option value="sensorvalue">Sensor value</option>
-//             <option value="restarttime">Restarttime value</option>
-
-//           </select>
-
-//         Set to <input type="text" name="value">
-//         <input type="submit" value="Set">
-//     </form>
-//     </div>
-//     <br> contract ky@pixka.me
-// </body>
-
-// </html>
-// )rawliteral";
 void setAPMode()
 {
   String mac = WiFi.macAddress();
@@ -478,14 +382,14 @@ void checkin()
       return;
   }
   busy = true;
-  StaticJsonDocument<500> doc1;
-  doc1["mac"] = WiFi.macAddress();
-  doc1["password"] = "";
-  doc1["ip"] = WiFi.localIP().toString();
-  doc1["uptime"] = uptime;
-  char JSONmessageBuffer[jsonsize];
-  serializeJsonPretty(doc1, JSONmessageBuffer, jsonsize);
-  Serial.println(JSONmessageBuffer);
+  // StaticJsonDocument<500> doc1;
+  doc["mac"] = WiFi.macAddress();
+  doc["password"] = "";
+  doc["ip"] = WiFi.localIP().toString();
+  doc["uptime"] = uptime;
+  // char JSONmessageBuffer[jsonsize];
+  serializeJsonPretty(doc, jsonChar, jsonsize);
+  // Serial.println(JSONmessageBuffer);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
   String h = "http://" + hosttraget + "/checkin";
@@ -493,7 +397,7 @@ void checkin()
   http.addHeader("Content-Type", "application/json"); //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
-  int httpCode = http.POST(JSONmessageBuffer); //Send the request
+  int httpCode = http.POST(jsonChar); //Send the request
   String payload = http.getString();           //Get the response payload
   Serial.print(" Http Code:");
   Serial.println(httpCode); //Print HTTP return code
@@ -502,8 +406,8 @@ void checkin()
     Serial.print(" Play load:");
     Serial.println(payload); //Print request response payload
     // DynamicJsonDocument doc(1024);
-    deserializeJson(doc1, payload);
-    JsonObject obj = doc1.as<JsonObject>();
+    deserializeJson(doc, payload);
+    JsonObject obj = doc.as<JsonObject>();
     name = obj["pidevice"]["name"].as<String>();
   }
 
@@ -809,7 +713,7 @@ void reset()
   doc["savepassword"] = wifidata.password;
   doc["reset"] = "OK";
 
-  char jsonChar[jsonsize];
+  // char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
