@@ -13,6 +13,8 @@
 #include <EEPROM.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <ESP8266Ping.h>
+const String version = "90";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -20,9 +22,12 @@ String dayStamp;
 String timeStamp;
 
 #define ADDR 100
-#define jsonsize 1200
+#define jsonsize 1500
 
 StaticJsonDocument<jsonsize> doc;
+char jsonChar[jsonsize];
+
+int makestatuscount = 0;
 long uptime = 0;
 long otatime = 0;
 long checkintime = 0;
@@ -40,7 +45,7 @@ double loadtotal = 0;
 #define ioport 7
 String name = "d1io";
 const String type = "D1IO";
-const String version = "86";
+
 extern "C"
 {
 #include "user_interface.h"
@@ -133,103 +138,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
-// const char setupconfig[] PROGMEM = R"rawliteral(
-// <!DOCTYPE HTML>
-// <html>
-// <style>
-//     input[type=text],
-//     select {
-//         width: 100%;
-//         padding: 12px 20px;
-//         margin: 8px 0;
-//         display: inline-block;
-//         border: 1px solid #ccc;
-//         border-radius: 4px;
-//         box-sizing: border-box;
-//     }
-//     input[type=password] {
-//   width: 100%;
-//   padding: 12px 20px;
-//   margin: 8px 0;
-//   display: inline-block;
-//   border: 1px solid #ccc;
-//   border-radius: 4px;
-//   box-sizing: border-box;
-// }
-//     input[type=submit] {
-//         width: 100%;
-//         background-color: #4CAF50;
-//         color: white;
-//         padding: 14px 20px;
-//         margin: 8px 0;
-//         border: none;
-//         border-radius: 4px;
-//         cursor: pointer;
-//     }
 
-//     input[type=submit]:hover {
-//         background-color: #45a049;
-//     }
-
-//     div {
-//         border-radius: 5px;
-//         background-color: #f2f2f2;
-//         padding: 20px;
-//     }
-// </style>
-// <script>
-// </script>
-
-// <head>
-//     <title>ESP WIFI Config</title>
-//     <meta name="viewport" content="width=device-width, initial-scale=1">
-// </head>
-
-// <body>
-
-// <div>
-// <h3>Set config</h3>
-//     <form action="/setvalue">
-//        Have<select id="cars" name="p">
-//             <option value="havedht">Dht</option>
-//             <option value="havesht">SHT</option>
-//             <option value="haveds">DS</option>
-//             <option value="havea0">A0</option>
-//             <option value="havetorestart">Auto restart</option>
-//           </select>
-
-//         Set to<select name="value">
-//             <option value="1">Enable</option>
-//             <option value="0">Disable</option>
-//           </select>
-//         <input type="submit" value="Set">
-//     </form>
-//     <form action="/restart">
-//         <input type="submit" value="Restart">
-//     </form>
-
-//     <form action="/get">
-//     SSID: <input type="text" name="ssid">
-//     PASSWORD: <input type="password" name="password">
-//     <input type="submit" value="setwifi">
-//   </form>
-
-//    <form action="/setvalue">
-//        Set value : <select id="cars" name="p">
-//             <option value="sensorvalue">Sensor value</option>
-//             <option value="restarttime">Restarttime value</option>
-
-//           </select>
-
-//         Set to <input type="text" name="value">
-//         <input type="submit" value="Set">
-//     </form>
-//     </div>
-//     <br> contract ky@pixka.me
-// </body>
-
-// </html>
-// )rawliteral";
 void setAPMode()
 {
   String mac = WiFi.macAddress();
@@ -274,7 +183,6 @@ void readDHT()
     dhtbuffer.count = 120; //update buffer life time
   }
 
-  // tempC = sensors.getTempC(t);
 }
 void updateNTP()
 {
@@ -335,8 +243,6 @@ void trytoota()
     re = "update ok";
     break;
   }
-  doc.clear();
-
   doc["name"] = name;
   doc["ip"] = WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
@@ -346,7 +252,6 @@ void trytoota()
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
   doc["updateresult"] = re;
-  char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -359,7 +264,6 @@ void get()
 {
   String ssd = server.arg("ssid");
   String password = server.arg("password");
-
   Serial.print("SSD ");
   Serial.println(ssd);
   Serial.print("password ");
@@ -375,10 +279,9 @@ void get()
   EEPROM.put(ADDR, wifidata);
   EEPROM.commit();
   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set WIFI TO " + ssd + " <h3><hr><a href='/setconfig'>back</a></html>";
-
   server.send(200, "text/html", re);
 }
-void status()
+void makestatus()
 {
   doc.clear();
   doc["name"] = name;
@@ -388,6 +291,7 @@ void status()
   doc["signal"] = WiFi.RSSI();
   doc["version"] = version;
   doc["freemem"] = system_get_free_heap_size();
+  doc["heap"] = system_get_free_heap_size();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
@@ -429,15 +333,17 @@ void status()
   doc["ntptime"] = timeClient.getFormattedTime();
   doc["ntptimelong"] = timeClient.getEpochTime();
   doc["type"] = type;
-  updateNTP();
+  // updateNTP();
   doc["datetime"] = formattedDate;
   doc["date"] = dayStamp;
   doc["time"] = timeStamp;
   doc["load"] = load;
   doc["loadav"] = loadav;
-
-  char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
+}
+void status()
+{
+
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
@@ -447,7 +353,6 @@ void setclosetime()
 {
 
   int s = server.arg("time").toInt();
-  // timetocount = s;
   digitalWrite(D5, 1);
 
   String closetime = server.arg("closetime");
@@ -455,11 +360,9 @@ void setclosetime()
   ports[2].delay = s;
   ports[2].value = 1;
   ports[2].closetime = closetime;
-  doc.clear();
   doc["run"] = "ok";
   doc["countime"] = s;
   doc["closeat"] = closetime;
-  char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "application/json", jsonChar);
 }
@@ -477,15 +380,12 @@ void checkin()
       return;
   }
   busy = true;
-  // StaticJsonDocument<500> doc;
-  doc.clear();
   doc["mac"] = WiFi.macAddress();
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
   doc["uptime"] = uptime;
-  char JSONmessageBuffer[jsonsize];
-  serializeJsonPretty(doc, JSONmessageBuffer, jsonsize);
-  Serial.println(JSONmessageBuffer);
+  // char JSONmessageBuffer[jsonsize];
+  serializeJsonPretty(doc, jsonChar, jsonsize);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
   String h = "http://" + hosttraget + "/checkin";
@@ -493,7 +393,7 @@ void checkin()
   http.addHeader("Content-Type", "application/json"); //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
-  int httpCode = http.POST(JSONmessageBuffer); //Send the request
+  int httpCode = http.POST(jsonChar); //Send the request
   String payload = http.getString();           //Get the response payload
   Serial.print(" Http Code:");
   Serial.println(httpCode); //Print HTTP return code
@@ -581,11 +481,10 @@ void DHTtoJSON()
     dhtbuffer.count = 120;
   }
   digitalWrite(b_led, HIGH);
-  doc.clear();
+  // doc.clear();
   doc["t"] = pfTemp;
   doc["h"] = pfHum;
   doc["ip"] = WiFi.macAddress();
-  char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "application/json", jsonChar);
   Serial.println("End read dht");
@@ -617,7 +516,7 @@ void run()
   {
     message = "test port ";
     canuseled = 0;
-    doc.clear();
+    // doc.clear();
     doc["status"] = "ok";
     doc["port"] = p;
     doc["mac"] = WiFi.macAddress();
@@ -626,7 +525,7 @@ void run()
     doc["uptime"] = uptime;
     doc["ntptime"] = timeClient.getFormattedTime();
     doc["ntptimelong"] = timeClient.getEpochTime();
-    char jsonChar[jsonsize];
+
     serializeJsonPretty(doc, jsonChar, jsonsize);
     server.send(200, "application/json", jsonChar);
     for (int i = 0; i < 40; i++)
@@ -647,15 +546,14 @@ void run()
 
   int port = getPort(p);
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
-  doc.clear();
+  // doc.clear();
   doc["status"] = "ok";
   doc["port"] = p;
   doc["runtime"] = d;
   doc["value"] = value;
   doc["mac"] = WiFi.macAddress();
   doc["ip"] = WiFi.localIP().toString();
-  doc["uptime"]=uptime;
-  char jsonChar[jsonsize];
+  doc["uptime"] = uptime;
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "application/json", jsonChar);
 }
@@ -665,15 +563,15 @@ void setwifi()
 }
 void ssid()
 {
-  doc.clear();
+  // doc.clear();
   doc["ssid"] = WiFi.SSID();
-
-  char jsonChar[jsonsize];
+  // char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "applic ation/json", jsonChar);
 }
 void flip()
 {
+  makestatuscount++;
   uptime++;      //เวลา run
   otatime++;     //เพิ่มการ update
   checkintime++; //เพิ่มการนับ
@@ -811,7 +709,7 @@ void reset()
   doc["savepassword"] = wifidata.password;
   doc["reset"] = "OK";
 
-  char jsonChar[jsonsize];
+  // char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -978,16 +876,28 @@ void loop()
     readDHT();
   }
 
-  if (configdata.havetorestart & restarttime > 60)
+  if (configdata.havetorestart && restarttime > 60)
   { //ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
-    printIPAddressOfHost("fw.pixka.me");
+    // printIPAddressOfHost("fw.pixka.me");
+    if (!Ping.ping(WiFi.gatewayIP()))
+    {
+      WiFi.disconnect();
+      delay(1000);
+      WiFi.reconnect();
+      
+    }
+    restarttime = 0;
   }
 
   if (apmodetimeout > 600)
   {
-    ESP.restart();
+    WiFi.reconnect();
   }
-
+  if (makestatuscount > 2)
+  {
+    makestatus();
+    makestatuscount = 0;
+  }
   load = millis() - s;
   loadcount++;
   loadtotal += load;
