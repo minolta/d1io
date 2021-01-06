@@ -14,7 +14,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP8266Ping.h>
-const String version = "89";
+const String version = "90";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -22,7 +22,7 @@ String dayStamp;
 String timeStamp;
 
 #define ADDR 100
-#define jsonsize 1200
+#define jsonsize 1500
 
 StaticJsonDocument<jsonsize> doc;
 char jsonChar[jsonsize];
@@ -183,7 +183,6 @@ void readDHT()
     dhtbuffer.count = 120; //update buffer life time
   }
 
-  // tempC = sensors.getTempC(t);
 }
 void updateNTP()
 {
@@ -265,7 +264,6 @@ void get()
 {
   String ssd = server.arg("ssid");
   String password = server.arg("password");
-
   Serial.print("SSD ");
   Serial.println(ssd);
   Serial.print("password ");
@@ -293,6 +291,7 @@ void makestatus()
   doc["signal"] = WiFi.RSSI();
   doc["version"] = version;
   doc["freemem"] = system_get_free_heap_size();
+  doc["heap"] = system_get_free_heap_size();
   doc["h"] = pfHum;
   doc["t"] = pfTemp;
   doc["uptime"] = uptime;
@@ -354,7 +353,6 @@ void setclosetime()
 {
 
   int s = server.arg("time").toInt();
-  // timetocount = s;
   digitalWrite(D5, 1);
 
   String closetime = server.arg("closetime");
@@ -382,14 +380,12 @@ void checkin()
       return;
   }
   busy = true;
-  // StaticJsonDocument<500> doc1;
   doc["mac"] = WiFi.macAddress();
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
   doc["uptime"] = uptime;
   // char JSONmessageBuffer[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
-  // Serial.println(JSONmessageBuffer);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
   String h = "http://" + hosttraget + "/checkin";
@@ -897,7 +893,7 @@ void loop()
   {
     WiFi.reconnect();
   }
-  if (makestatuscount > 0)
+  if (makestatuscount > 2)
   {
     makestatus();
     makestatuscount = 0;
