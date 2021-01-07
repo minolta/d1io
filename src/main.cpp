@@ -504,6 +504,7 @@ int getPort(String p)
   {
     return D8;
   }
+  return 0;
 }
 
 void DHTtoJSON()
@@ -752,6 +753,9 @@ void reset()
 void resettodefault()
 {
   cfg.resettodefault();
+  server.send(200, "text/html", "Reset config file ok");
+  delay(1000);
+  ESP.restart();
 }
 void setHttp()
 {
