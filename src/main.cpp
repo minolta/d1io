@@ -749,6 +749,10 @@ void reset()
   server.send(200, "application/json", jsonChar);
   ESP.restart();
 }
+void resettodefault()
+{
+  cfg.resettodefault();
+}
 void setHttp()
 {
   server.on("/run", run);
@@ -765,6 +769,7 @@ void setHttp()
   server.on("/restart", reset);
   server.on("/setvalue", setvalue);
   server.on("/setclosetime", setclosetime);
+  server.on("/resettodefault", resettodefault);
   server.begin(); //เปิด TCP Server
   Serial.println("Server started");
 }
