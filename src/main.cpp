@@ -14,7 +14,12 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP8266Ping.h>
-const String version = "90";
+#include "Configfile.h"
+void loadconfigtoram();
+void configdatatofile();
+Configfile cfg("/config.cfg");
+
+const String version = "91";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -51,14 +56,9 @@ extern "C"
 #include "user_interface.h"
 }
 long counttime = 0;
-// SSD1306 display(0x3C, D2, D1);
-//D2 = SDA  D1 = SCL
-// String hosttraget = "192.168.88.9:2222";
 String hosttraget = "point.pixka.me:2222";
-// String otahost = "192.168.88.9";
 String otahost = "point.pixka.me";
 String updateString = "/espupdate/d1io/" + version;
-// SSD1306 display(0x3C, RX, TX);
 String message = "";
 struct
 {
@@ -122,11 +122,61 @@ public:
   Portio *n;
   Portio *p;
 };
+void loadconfigtoram()
+{
+  configdata.va0 = cfg.getConfig("va0").toFloat();
+  configdata.sensorvalue = cfg.getConfig("senservalue").toDouble();
 
+  configdata.havedht = cfg.getIntConfig("havedht");
+  configdata.havea0 = cfg.getIntConfig("havea0");
+  configdata.haveds = cfg.getIntConfig("haveds");
+  configdata.havesht = cfg.getIntConfig("havesht");
+  configdata.havetorestart = cfg.getIntConfig("havetorestart");
+}
+
+void configdatatofile()
+{
+  cfg.addConfig("va0", configdata.va0);
+  cfg.addConfig("senservalue", configdata.sensorvalue);
+  cfg.addConfig("havedht", configdata.havedht);
+  cfg.addConfig("havea0", configdata.havea0);
+  cfg.addConfig("haveds", configdata.haveds);
+  cfg.addConfig("havesht", configdata.havesht);
+  cfg.addConfig("haverestart", configdata.havetorestart);
+}
+void initConfig()
+{
+  cfg.openFile();
+  cfg.loadConfig();
+  Serial.printf("\n***** Init config **** \n");
+  delay(1000);
+
+  cfg.addConfig("ssid", "forpi");
+  cfg.addConfig("password", "04qwerty");
+
+  cfg.addConfig("va0", 0.5);
+  cfg.addConfig("sensorvalue", 42.5);
+
+  cfg.addConfig("D5mode", OUTPUT);
+  cfg.addConfig("D5initvalue", 0);
+  cfg.addConfig("D6mode", OUTPUT);
+  cfg.addConfig("D6initvalue", 0);
+  cfg.addConfig("D7mode", OUTPUT);
+  cfg.addConfig("D7initvalue", 0);
+  cfg.addConfig("D8mode", OUTPUT);
+  cfg.addConfig("D8initvalue", 0);
+
+  cfg.addConfig("havedht", 0);
+  cfg.addConfig("havea0", 0);
+  cfg.addConfig("haveds", 0);
+  cfg.addConfig("havertc", 0);
+  cfg.addConfig("havertc", 0);
+  cfg.addConfig("havepmsensor", 0);
+  cfg.addConfig("havesht", 0);
+  cfg.addConfig("havesonic", 0);
+  cfg.addConfig("haveoled", 0);
+}
 Portio ports[ioport];
-// #include <ESPAsyncWebServer.h>
-// AsyncWebServer aserver(80);
-
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html><head>
   <title>ESP WIFI </title>
@@ -182,7 +232,6 @@ void readDHT()
     dhtbuffer.h = pfHum;
     dhtbuffer.count = 120; //update buffer life time
   }
-
 }
 void updateNTP()
 {
@@ -204,7 +253,6 @@ void ota()
 {
   Serial.println("CALL " + otahost + " " + updateString);
   t_httpUpdate_return ret = ESPhttpUpdate.update(otahost, 8080, updateString, version);
-  // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   switch (ret)
   {
   case HTTP_UPDATE_FAILED:
@@ -225,7 +273,6 @@ void trytoota()
 {
   String re = "";
   t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/1");
-  // t_httpUpdate_return ret = ESPhttpUpdate.update("http://fw-dot-kykub-161406.appspot.com", 80, "/espupdate/d1proio/" + version, version);
   Serial.println(ret);
   switch (ret)
   {
@@ -256,7 +303,6 @@ void trytoota()
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  // 'Access-Control-Allow-Headers':'application/json'
   server.send(200, "application/json", jsonChar);
 }
 
@@ -333,7 +379,6 @@ void makestatus()
   doc["ntptime"] = timeClient.getFormattedTime();
   doc["ntptimelong"] = timeClient.getEpochTime();
   doc["type"] = type;
-  // updateNTP();
   doc["datetime"] = formattedDate;
   doc["date"] = dayStamp;
   doc["time"] = timeStamp;
@@ -343,7 +388,6 @@ void makestatus()
 }
 void status()
 {
-
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
@@ -351,12 +395,9 @@ void status()
 }
 void setclosetime()
 {
-
   int s = server.arg("time").toInt();
   digitalWrite(D5, 1);
-
   String closetime = server.arg("closetime");
-
   ports[2].delay = s;
   ports[2].value = 1;
   ports[2].closetime = closetime;
@@ -369,7 +410,6 @@ void setclosetime()
 
 void checkin()
 {
-
   int connectcount = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
@@ -384,7 +424,6 @@ void checkin()
   doc["password"] = "";
   doc["ip"] = WiFi.localIP().toString();
   doc["uptime"] = uptime;
-  // char JSONmessageBuffer[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
@@ -394,14 +433,13 @@ void checkin()
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
   int httpCode = http.POST(jsonChar); //Send the request
-  String payload = http.getString();           //Get the response payload
+  String payload = http.getString();  //Get the response payload
   Serial.print(" Http Code:");
   Serial.println(httpCode); //Print HTTP return code
   if (httpCode == 200)
   {
     Serial.print(" Play load:");
     Serial.println(payload); //Print request response payload
-    // DynamicJsonDocument doc(1024);
     deserializeJson(doc, payload);
     JsonObject obj = doc.as<JsonObject>();
     name = obj["pidevice"]["name"].as<String>();
@@ -429,8 +467,6 @@ void setport()
 
   ports[5].port = D8;
   ports[5].name = "D8";
-
-  // ports[6].port = D3;
 }
 int getPort(String p)
 {
@@ -546,7 +582,6 @@ void run()
 
   int port = getPort(p);
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
-  // doc.clear();
   doc["status"] = "ok";
   doc["port"] = p;
   doc["runtime"] = d;
@@ -563,9 +598,7 @@ void setwifi()
 }
 void ssid()
 {
-  // doc.clear();
   doc["ssid"] = WiFi.SSID();
-  // char jsonChar[jsonsize];
   serializeJsonPretty(doc, jsonChar, jsonsize);
   server.send(200, "applic ation/json", jsonChar);
 }
@@ -682,16 +715,14 @@ void setvalue()
   {
     configdata.restarttime = value.toInt();
   }
-  EEPROM.put(ADDR + 100, configdata);
-  EEPROM.commit();
+
+  configdatatofile();
 
   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set " + v + " TO " + value + " <h3><hr><a href='/setconfig'>back</a> <script type=\"text/JavaScript\"> redirectTime = \"1500\"; redirectURL = \"/setconfig\"; function timedRedirect() { setTimeout(\"location.href = redirectURL;\",redirectTime); } </script></html>";
   server.send(200, "text/html", re);
 }
 void reset()
 {
-  // StaticJsonDocument<1000> doc;
-  // JsonObject portsobj = doc.createNestedObject("ports");
   doc.clear();
   doc["name"] = name;
   doc["ip"] = WiFi.localIP().toString();
@@ -739,28 +770,20 @@ void setHttp()
 }
 void setup()
 {
-  EEPROM.begin(1000); // Use 1k for save value
   Serial.begin(9600);
-  int r = EEPROM.read(0);
-  if (r != 99)
+
+  if (!cfg.openFile())
   {
-    EEPROM.write(0, 99);
-    EEPROM.put(ADDR, wifidata);
-    EEPROM.put(ADDR + 100, configdata);
-    EEPROM.commit();
+    initConfig();
   }
-  else
-  {
-    EEPROM.get(ADDR, wifidata);
-    EEPROM.get(ADDR + 100, configdata);
-  }
+  loadconfigtoram();
   setport();
   Serial.println();
   Serial.println("-----------------------------------------------");
-  Serial.println(wifidata.ssid);
-  Serial.println(wifidata.password);
+  Serial.println(cfg.getConfig("ssid"));
+  Serial.println(cfg.getConfig("password"));
   Serial.println("-----------------------------------------------");
-  WiFiMulti.addAP(wifidata.ssid, wifidata.password);
+  WiFiMulti.addAP(cfg.getConfig("ssid", "forpi").c_str(), cfg.getConfig("password", "04qwerty").c_str());
   int ft = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
@@ -775,16 +798,12 @@ void setup()
       break;
     }
   }
-  // WiFi.mode(WIFI_STA);
-
-  // WiFiMulti.addAP("forpi3", "04qwerty");
   WiFiMulti.addAP("forpi", "04qwerty");
   WiFiMulti.addAP("forpi2", "04qwerty");
   WiFiMulti.addAP("forpi5", "04qwerty");
   WiFiMulti.addAP("forpi4", "04qwerty");
   WiFiMulti.addAP("Sirifarm", "0932154741");
   WiFiMulti.addAP("test", "12345678");
-  // WiFiMulti.addAP("farm", "12345678");
   WiFiMulti.addAP("pksy", "04qwerty");
   WiFiMulti.addAP("ky_MIFI", "04qwerty");
   setupport();
@@ -821,8 +840,6 @@ void setup()
   dht.begin();
   timeClient.begin();
   timeClient.setTimeOffset(25200); //Thailand +7 = 25200
-  // timeClient.setTimeOffset(TIME_ZONE * (60 * 60));
-  // timeClient.setUpdateInterval(300 * 1000);
 }
 void printIPAddressOfHost(const char *host)
 {
@@ -884,7 +901,6 @@ void loop()
       WiFi.disconnect();
       delay(1000);
       WiFi.reconnect();
-      
     }
     restarttime = 0;
   }
