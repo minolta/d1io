@@ -19,7 +19,7 @@ void loadconfigtoram();
 void configdatatofile();
 Configfile cfg("/config.cfg");
 
-const String version = "91";
+const String version = "94";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -136,18 +136,18 @@ void loadconfigtoram()
 
 void configdatatofile()
 {
-  cfg.addConfig("va0", configdata.va0);
-  cfg.addConfig("senservalue", configdata.sensorvalue);
-  cfg.addConfig("havedht", configdata.havedht);
-  cfg.addConfig("havea0", configdata.havea0);
-  cfg.addConfig("haveds", configdata.haveds);
-  cfg.addConfig("havesht", configdata.havesht);
-  cfg.addConfig("haverestart", configdata.havetorestart);
+  // cfg.addConfig("va0", configdata.va0);
+  // cfg.addConfig("senservalue", configdata.sensorvalue);
+  // cfg.addConfig("havedht", configdata.havedht);
+  // cfg.addConfig("havea0", configdata.havea0);
+  // cfg.addConfig("haveds", configdata.haveds);
+  // cfg.addConfig("havesht", configdata.havesht);
+  // cfg.addConfig("haverestart", configdata.havetorestart);
 }
 void initConfig()
 {
   cfg.openFile();
-  cfg.loadConfig();
+  // cfg.loadConfig();
   Serial.printf("\n***** Init config **** \n");
   delay(1000);
 
@@ -315,15 +315,18 @@ void get()
   Serial.print("password ");
   Serial.println(password);
 
-  if (ssd != NULL)
-    ssd.toCharArray(wifidata.ssid, 50);
+  cfg.addConfig("ssid", ssd);
+  cfg.addConfig("password", password);
+  loadconfigtoram();
+  // if (ssd != NULL)
+  //   ssd.toCharArray(wifidata.ssid, 50);
 
-  if (password != NULL)
-    password.toCharArray(wifidata.password, 50);
+  // if (password != NULL)
+  //   password.toCharArray(wifidata.password, 50);
 
   Serial.println("Set ok");
-  EEPROM.put(ADDR, wifidata);
-  EEPROM.commit();
+  // EEPROM.put(ADDR, wifidata);
+  // EEPROM.commit();
   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set WIFI TO " + ssd + " <h3><hr><a href='/setconfig'>back</a></html>";
   server.send(200, "text/html", re);
 }
@@ -676,7 +679,7 @@ String intToEnable(int i)
 }
 void setconfig()
 {
-  String html = " <!DOCTYPE html> <style> table { font-family: \"Trebuchet MS\", Arial, Helvetica, sans-serif; border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } tr:nth-child(even) { background-color: #f2f2f2; } tr:hover { background-color: #ddd; } th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #4CAF50; color: white; } button { /* width: 100%; */ background-color: #4CAF50; color: white; padding: 10px 15px; /* margin: 8px 0; */ border: none; border-radius: 4px; cursor: pointer; } .button3 { background-color: #f44336; } </style> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <meta charset=\"UTF-8\"> </head> Config in " + String(name) + " version:" + String(version) + " SSID:" + WiFi.SSID() + " Signel: " + String(WiFi.RSSI()) + " type:" + String(type) + " <table id=\"customres\"> <tr> <td>Parameter</td> <td>value</td> <td>Option</td> </tr> <tr> <td>DHT</td> <td>" + intToEnable(configdata.havedht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\" value=\"1\">Disable</button> </form> </td> </tr> <tr> <td>SHT</td> <td>" + intToEnable(configdata.havesht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>DS</td> <td>" + intToEnable(configdata.haveds) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>A0</td> <td>" + intToEnable(configdata.havea0) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Have to restart</td> <td>" + intToEnable(configdata.havetorestart) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Sensor value </td> <td>" + String(configdata.sensorvalue) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"sensorvalue\"> <input type=\"number\" name=\"value\" value=\"{{valuesesnsor}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> <tr> <td>Auto restart value </td> <td>" + String(configdata.restarttime) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"restarttime\"> <input type=\"number\" name=\"value\" value=\"{{valuerestarttime}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> </table> <hr> <form action=\"/get\"> <table> <tr> <td colspan=\"3\">WIFI information</td> </tr> <tr> <td>SSID</td> <td>" + String(wifidata.ssid) + "</td> <td><input type=\"text\" name=\"ssid\"></td> </tr> <tr> <td>PASSWORD</td> <td>********</td> <td><input type=\"password\" name=\"password\"></td> </tr> <tr> <td colspan=\"3\" align=\"right\"><button type=\"submit\">Set wifi</button></td> </tr> </table> </form> <form action=\"/restart\"> <button type=\"submit\" class=\"button3\" value=\"Restart\">Restart</button> </form> ky@pixka.me 2020 </html>";
+  String html = " <!DOCTYPE html> <style> table { font-family: \"Trebuchet MS\", Arial, Helvetica, sans-serif; border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } tr:nth-child(even) { background-color: #f2f2f2; } tr:hover { background-color: #ddd; } th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #4CAF50; color: white; } button { /* width: 100%; */ background-color: #4CAF50; color: white; padding: 10px 15px; /* margin: 8px 0; */ border: none; border-radius: 4px; cursor: pointer; } .button3 { background-color: #f44336; } </style> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <meta charset=\"UTF-8\"> </head> Config in " + String(name) + " version:" + String(version) + " SSID:" + cfg.getConfig("ssid") + " Signel: " + String(WiFi.RSSI()) + " type:" + String(type) + " <table id=\"customres\"> <tr> <td>Parameter</td> <td>value</td> <td>Option</td> </tr> <tr> <td>DHT</td> <td>" + intToEnable(configdata.havedht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\" value=\"1\">Disable</button> </form> </td> </tr> <tr> <td>SHT</td> <td>" + intToEnable(configdata.havesht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>DS</td> <td>" + intToEnable(configdata.haveds) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>A0</td> <td>" + intToEnable(configdata.havea0) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Have to restart</td> <td>" + intToEnable(configdata.havetorestart) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Sensor value </td> <td>" + String(configdata.sensorvalue) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"sensorvalue\"> <input type=\"number\" name=\"value\" value=\"{{valuesesnsor}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> <tr> <td>Auto restart value </td> <td>" + String(configdata.restarttime) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"restarttime\"> <input type=\"number\" name=\"value\" value=\"{{valuerestarttime}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> </table> <hr> <form action=\"/get\"> <table> <tr> <td colspan=\"3\">WIFI information</td> </tr> <tr> <td>SSID</td> <td>" + cfg.getConfig("ssid") + "</td> <td><input type=\"text\" name=\"ssid\"></td> </tr> <tr> <td>PASSWORD</td> <td>********</td> <td><input type=\"password\" name=\"password\"></td> </tr> <tr> <td colspan=\"3\" align=\"right\"><button type=\"submit\">Set wifi</button></td> </tr> </table> </form> <form action=\"/restart\"> <button type=\"submit\" class=\"button3\" value=\"Restart\">Restart</button> </form> ky@pixka.me 2020 </html>";
   server.send(200, "text/html", html);
 }
 void setvalue()
@@ -684,40 +687,51 @@ void setvalue()
   String v = server.arg("p");
   String value = server.arg("value");
   String value2 = server.arg("value2");
+  Serial.print("Set config:");
+  Serial.print(v);
+  Serial.printf("to %s", value.c_str());
   if (v.equals("va0"))
   {
     configdata.va0 = value.toFloat();
+    cfg.addConfig("va0", configdata.va0);
   }
   else if (v.equals("sensorvalue"))
   {
     configdata.sensorvalue = value.toFloat();
+    cfg.addConfig("senservalue", configdata.sensorvalue);
   }
   else if (v.equals("havedht"))
   {
     configdata.havedht = value.toInt();
+    cfg.addConfig("havedht", configdata.havedht);
   }
   else if (v.equals("haveds"))
   {
     configdata.haveds = value.toInt();
+    cfg.addConfig("haveds", configdata.haveds);
   }
   else if (v.equals("havea0"))
   {
     configdata.havea0 = value.toInt();
+    cfg.addConfig("havea0", configdata.havea0);
   }
   else if (v.equals("havetorestart"))
   {
     configdata.havetorestart = value.toInt();
+    cfg.addConfig("haverestart", configdata.havetorestart);
   }
   else if (v.equals("havesht"))
   {
     configdata.havesht = value.toInt();
+    cfg.addConfig("havesht", configdata.havesht);
   }
   else if (v.equals("restarttime"))
   {
     configdata.restarttime = value.toInt();
+    cfg.addConfig("restarttime",configdata.restarttime);
   }
 
-  configdatatofile();
+  // configdatatofile();
 
   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set " + v + " TO " + value + " <h3><hr><a href='/setconfig'>back</a> <script type=\"text/JavaScript\"> redirectTime = \"1500\"; redirectURL = \"/setconfig\"; function timedRedirect() { setTimeout(\"location.href = redirectURL;\",redirectTime); } </script></html>";
   server.send(200, "text/html", re);
@@ -757,6 +771,16 @@ void resettodefault()
   delay(1000);
   ESP.restart();
 }
+void configfile()
+{
+  char b[2048];
+  DynamicJsonDocument configbuf = cfg.getAll();
+  serializeJsonPretty(configbuf, b, 2048);
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  server.send(200, "application/json", b);
+}
 void setHttp()
 {
   server.on("/run", run);
@@ -768,6 +792,7 @@ void setHttp()
   server.on("/setwifi", setwifi);
   server.on("/get", get);
   server.on("/setconfig", setconfig);
+  server.on("/configfile", configfile);
   server.on("/", status);
   server.on("/reset", reset);
   server.on("/restart", reset);
