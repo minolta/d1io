@@ -14,6 +14,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP8266Ping.h>
+#include <LITTLEFS.h>
 #include "Configfile.h"
 void loadconfigtoram();
 void configdatatofile();

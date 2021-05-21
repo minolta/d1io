@@ -6,6 +6,7 @@
     "files.associations": {
         "functional": "cpp",
         "type_traits": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "string": "cpp"
     }
 }
