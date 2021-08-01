@@ -252,8 +252,9 @@ void updateNTP()
 }
 void ota()
 {
+  WiFiClient client;
   Serial.println("CALL " + otahost + " " + updateString);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(otahost, 8080, updateString, version);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(client,otahost, 8080, updateString, version.c_str());
   switch (ret)
   {
   case HTTP_UPDATE_FAILED:
@@ -272,39 +273,39 @@ void ota()
 
 void trytoota()
 {
-  String re = "";
-  t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/1");
-  Serial.println(ret);
-  switch (ret)
-  {
-  case HTTP_UPDATE_FAILED:
-    Serial.println("[update] Update failed.");
-    re = "Update failed";
-    break;
-  case HTTP_UPDATE_NO_UPDATES:
+  // String re = "";
+  // t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/",version.c_str());
+  // Serial.println(ret);
+  // switch (ret)
+  // {
+  // case HTTP_UPDATE_FAILED:
+  //   Serial.println("[update] Update failed.");
+  //   re = "Update failed";
+  //   break;
+  // case HTTP_UPDATE_NO_UPDATES:
 
-    Serial.println("[update] Update no Update.");
-    re = "No update";
-    break;
-  case HTTP_UPDATE_OK:
-    Serial.println("[update] Update ok."); // may not called we reboot the ESP
-    re = "update ok";
-    break;
-  }
-  doc["name"] = name;
-  doc["ip"] = WiFi.localIP().toString();
-  doc["mac"] = WiFi.macAddress();
-  doc["ssid"] = WiFi.SSID();
-  doc["version"] = version;
-  doc["h"] = pfHum;
-  doc["t"] = pfTemp;
-  doc["uptime"] = uptime;
-  doc["updateresult"] = re;
-  serializeJsonPretty(doc, jsonChar, jsonsize);
-  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  server.send(200, "application/json", jsonChar);
+  //   Serial.println("[update] Update no Update.");
+  //   re = "No update";
+  //   break;
+  // case HTTP_UPDATE_OK:
+  //   Serial.println("[update] Update ok."); // may not called we reboot the ESP
+  //   re = "update ok";
+  //   break;
+  // }
+  // doc["name"] = name;
+  // doc["ip"] = WiFi.localIP().toString();
+  // doc["mac"] = WiFi.macAddress();
+  // doc["ssid"] = WiFi.SSID();
+  // doc["version"] = version;
+  // doc["h"] = pfHum;
+  // doc["t"] = pfTemp;
+  // doc["uptime"] = uptime;
+  // doc["updateresult"] = re;
+  // serializeJsonPretty(doc, jsonChar, jsonsize);
+  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  // server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  // server.send(200, "application/json", jsonChar);
 }
 
 void get()
@@ -414,6 +415,7 @@ void setclosetime()
 
 void checkin()
 {
+  WiFiClient client;
   int connectcount = 0;
   while (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
   {
@@ -432,7 +434,7 @@ void checkin()
   // put your main code here, to run repeatedly:
   HTTPClient http; //Declare object of class HTTPClient
   String h = "http://" + hosttraget + "/checkin";
-  http.begin(h);                                      //Specify request destination
+  http.begin(client,h);                                      //Specify request destination
   http.addHeader("Content-Type", "application/json"); //Specify content-type header
   http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
