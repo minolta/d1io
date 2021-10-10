@@ -20,7 +20,7 @@ void loadconfigtoram();
 void configdatatofile();
 Configfile cfg("/config.cfg");
 
-const String version = "94";
+const String version = "95";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
