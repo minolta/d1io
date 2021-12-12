@@ -589,7 +589,10 @@ void run()
 
   int port = getPort(p);
   if(p == NULL)
+  {
    port = D5;
+   v = "1";
+  }
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
   doc["status"] = "ok";
   doc["port"] = p;
