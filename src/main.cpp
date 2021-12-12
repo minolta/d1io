@@ -588,7 +588,7 @@ void run()
   int value = v.toInt();
 
   int port = getPort(p);
-  if(port==0)
+  if(p == NULL)
    port = D5;
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
   doc["status"] = "ok";
