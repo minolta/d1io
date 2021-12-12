@@ -20,7 +20,7 @@ void loadconfigtoram();
 void configdatatofile();
 Configfile cfg("/config.cfg");
 
-const String version = "95";
+const String version = "96";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -588,6 +588,8 @@ void run()
   int value = v.toInt();
 
   int port = getPort(p);
+  if(port==0)
+   port = D5;
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
   doc["status"] = "ok";
   doc["port"] = p;
