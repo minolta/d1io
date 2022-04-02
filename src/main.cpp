@@ -18,9 +18,10 @@
 #include "Configfile.h"
 void loadconfigtoram();
 void configdatatofile();
+void configwww();
 Configfile cfg("/config.cfg");
 
-const String version = "95";
+const String version = "96";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -270,7 +271,17 @@ void ota()
     break;
   }
 }
+void setp()
+{
+  String configname = server.arg("configname");
+  String value = server.arg("value");
 
+  cfg.addConfig(configname,value);
+  char buf[500];
+  sprintf(buf,"{\"configname\":\"%s\" , \"value\":\"%s\"}",configname,value);
+  server.send(200, "application/json", buf);
+
+}
 void trytoota()
 {
   // String re = "";
@@ -448,7 +459,8 @@ void checkin()
     Serial.println(payload); //Print request response payload
     deserializeJson(doc, payload);
     JsonObject obj = doc.as<JsonObject>();
-    name = obj["pidevice"]["name"].as<String>();
+    name = obj["name"].as<String>();
+    cfg.addConfig("name",name);
   }
 
   http.end(); //Close connection
@@ -796,6 +808,8 @@ void setHttp()
   server.on("/get", get);
   server.on("/setconfig", setconfig);
   server.on("/configfile", configfile);
+  server.on("/config", configwww);
+  server.on("/setp",setp);
   server.on("/", status);
   server.on("/reset", reset);
   server.on("/restart", reset);
@@ -808,7 +822,7 @@ void setHttp()
 void setup()
 {
   Serial.begin(9600);
-
+  cfg.setbuffer(512);
   if (!cfg.openFile())
   {
     initConfig();
@@ -877,6 +891,17 @@ void setup()
   dht.begin();
   timeClient.begin();
   timeClient.setTimeOffset(25200); //Thailand +7 = 25200
+}
+void configwww()
+{
+
+  DynamicJsonDocument d = cfg.getAll();
+  int size = d.capacity();
+  char buf[size];
+  serializeJsonPretty(d, buf, size);
+  Serial.print("Size:");
+  Serial.println(size);
+  server.send(200, "application/json", buf);
 }
 void printIPAddressOfHost(const char *host)
 {
