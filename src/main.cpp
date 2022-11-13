@@ -21,7 +21,6 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-
 #define jsonbuffersize 1024
 void loadconfigtoram();
 void configdatatofile();
@@ -142,7 +141,7 @@ void loadconfigtoram()
   configdata.haveds = cfg.getIntConfig("haveds", 0);
   configdata.havesht = cfg.getIntConfig("havesht", 0);
   configdata.havetorestart = cfg.getIntConfig("havetorestart", 0);
-  configdata.maxconnecttimeout = cfg.getIntConfig("maxconnecttimeout",60);
+  configdata.maxconnecttimeout = cfg.getIntConfig("maxconnecttimeout", 60);
 }
 
 void configdatatofile()
@@ -539,7 +538,7 @@ int getPort(String p)
 }
 /**
  * @brief สำหรับ set port ให้ทำงานตาม value และ delay
- * 
+ *
  * @param port  ที่กำหนด
  * @param delay  เวลาการทำงาน
  * @param value logic
@@ -725,6 +724,12 @@ void setHttp()
             { 
              String re =  makestatus();
               request->send(200, "application/json", re); });
+  server.on("/allconfig", HTTP_GET, [](AsyncWebServerRequest *request)
+            { 
+              DynamicJsonDocument o  = cfg.getAll();
+             char b[1024];
+              serializeJsonPretty(o,b,jsonbuffersize); 
+              request->send(200, "application/json", b); });
   server.on("/run", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
                 Serial.println("Run");
@@ -818,51 +823,49 @@ void setHttp()
 void Apmoderun()
 {
   ApMode ap("cfg.cfg");
-   ap.setApname("ESP Sensor AP Mode");
-   ap.run();
+  ap.setApname("ESP Sensor AP Mode");
+  ap.run();
 }
 void wificonnect()
 {
 
-    WiFi.mode(WIFI_STA);
-    Serial.println();
-    Serial.println("-----------------------------------------------");
-    Serial.println(cfg.getConfig("ssid", "forpi"));
-    Serial.println(cfg.getConfig("password", "04qwerty"));
-    Serial.println("-----------------------------------------------");
-   
-    WiFi.begin(cfg.getConfig("ssid", "forpi").c_str(), cfg.getConfig("password", "04qwerty").c_str());
-    Serial.print("connect.");
-    int ft = 0;
-    // display.clear();
-    while (WiFi.status() != WL_CONNECTED) //รอการเชื่อมต่อ
-    {
-        delay(250);
-       
-       
-        ft++;
-        if (ft > configdata.maxconnecttimeout)
-        {
-            Serial.println("Connect main wifi timeout");
-            apmode = 1;
-            break;
-        }
-        Serial.print(".");
-    }
+  WiFi.mode(WIFI_STA);
+  Serial.println();
+  Serial.println("-----------------------------------------------");
+  Serial.println(cfg.getConfig("ssid", "forpi"));
+  Serial.println(cfg.getConfig("password", "04qwerty"));
+  Serial.println("-----------------------------------------------");
 
-    if (apmode)
-    {
-        Apmoderun();
-    }
-    else
-    {
+  WiFi.begin(cfg.getConfig("ssid", "forpi").c_str(), cfg.getConfig("password", "04qwerty").c_str());
+  Serial.print("connect.");
+  int ft = 0;
+  // display.clear();
+  while (WiFi.status() != WL_CONNECTED) //รอการเชื่อมต่อ
+  {
+    delay(250);
 
-        Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
-        String ip = WiFi.localIP().toString();
-        String mac = WiFi.macAddress();
-        Serial.println(mac); // แสดงหมายเลข IP ของ Server
-
+    ft++;
+    if (ft > configdata.maxconnecttimeout)
+    {
+      Serial.println("Connect main wifi timeout");
+      apmode = 1;
+      break;
     }
+    Serial.print(".");
+  }
+
+  if (apmode)
+  {
+    Apmoderun();
+  }
+  else
+  {
+
+    Serial.println(WiFi.localIP()); // แสดงหมายเลข IP ของ Server
+    String ip = WiFi.localIP().toString();
+    String mac = WiFi.macAddress();
+    Serial.println(mac); // แสดงหมายเลข IP ของ Server
+  }
 }
 void setup()
 {
