@@ -610,6 +610,10 @@ void portcheck()
       ports[i].run = 0;
   }
 }
+/**
+ * @brief setup port mode
+ * 
+ */
 void setupport()
 {
   pinMode(D1, OUTPUT);
@@ -876,6 +880,7 @@ void setup()
     initConfig();
   }
   loadconfigtoram();
+  setupport();
   setport();
   Serial.println();
   Serial.println("-----------------------------------------------");
