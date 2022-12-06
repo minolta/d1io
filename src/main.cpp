@@ -721,6 +721,165 @@ String intToEnable(int i)
 //   cfg.addConfig(v, value);
 //   server.send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}");
 // }
+
+const char configfile_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html><head>
+  <title>Config</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html {font-family: Arial; display: inline-block; text-align: center;}
+    h2 {font-size: 3.0rem;}
+    p {font-size: 3.0rem;}
+    body {max-width: 600px; margin:0px auto; padding-bottom: 25px;}
+    .switch {position: relative; display: inline-block; width: 120px; height: 68px} 
+    .switch input {display: none}
+    .slider {position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 6px}
+    .slider:before {position: absolute; content: ""; height: 52px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 3px}
+    input:checked+.slider {background-color: #b30000}
+    input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
+
+#customers {
+    /* font-family: 'Karla', Tahoma, Varela, Arial, Helvetica, sans-serif; */
+    border-collapse: collapse;
+    width: 100%%;
+    /* font-size: 12px; */
+}
+#btn {
+  border: 1px solid #777;
+  background: #6e9e2d;
+  color: #fff;
+  font: bold 11px 'Trebuchet MS';
+  padding: 4px;
+  cursor: pointer;
+  -moz-border-radius: 4px;
+  -webkit-border-radius: 4px;
+}
+.button {
+  background-color: #4CAF50; /* Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+}
+#customers td,
+#customers th {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+
+/* #customers tr:nth-child(even){background-color: #f2f2f2;} */
+
+#customers tr:hover {
+    background-color: #ddd;
+}
+
+#customers th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: left;
+    background-color: #4CAF50;
+    color: white;
+}
+</style>
+
+<script>
+function deleteallconfig()
+{
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/resetconfig", true); 
+    xhr.send();
+}
+function remove(config)
+{
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/removeconfig?configname="+config, true); 
+
+     xhr.addEventListener("readystatechange", () => {
+     console.log(xhr.readystate);
+    if (xhr.readyState === 4 && xhr.status === 200) {
+     console.log(xhr.responseText);
+     location.reload();
+     }
+ });
+    xhr.send();
+}
+function add()
+{
+  var xhr = new XMLHttpRequest();
+  var input = document.getElementById('newconfigname');
+  var value = document.getElementById('newvalue');
+  xhr.open("GET", "/setconfig?configname="+input.value+"&value="+value.value, true); 
+  xhr.addEventListener("readystatechange", () => {
+     console.log(xhr.readystate);
+    if (xhr.readyState === 4 && xhr.status === 200) {
+     console.log(xhr.responseText);
+     var o =  JSON.parse(xhr.responseText);
+     var t = document.getElementById('customers');
+     var row = t.insertRow();
+     row.innerHTML = "<td>"+o.setconfig+"</td><td>"+o.value+"</td><td><input value="+o.value+"></td>";
+     }
+ });
+  xhr.send();
+}
+function setvalue(element,configname,value) {
+  console.log("Call",element);
+  var xhr = new XMLHttpRequest();
+  var input = document.getElementById(configname);
+
+  xhr.open("GET", "/setconfig?configname="+configname+"&value="+input.value, true); 
+  xhr.addEventListener("readystatechange", () => {
+     console.log(xhr.readystate);
+    if (xhr.readyState === 4 && xhr.status === 200) {
+     console.log(xhr.responseText);
+    var o =  JSON.parse(xhr.responseText);
+  var showvalue = document.getElementById(configname+'value');  
+  console.log('Showvalue',showvalue);
+  console.log('O',o);
+  showvalue.innerHTML = o.value
+    } else if (xhr.readyState === 4) {
+     console.log("could not fetch the data");
+     }
+        });
+  xhr.send();
+}
+</script>
+  </head><body>
+ <table id="customers">
+  <tr>
+  <td>Config</td><td>value</td><td>Set</td><td>#</td><td>x</td>
+  </tr>
+  %CONFIG%
+ </table>
+<hr>
+New Config <input id=newconfigname> <input id=newvalue> <button  id=btn onClick="add()">add </button>
+<hr>
+<button id=btn onClick="deleteallconfig()">Reset Config</button>
+
+</body></html>)rawliteral";
+String fillconfig(const String &var)
+{
+    // Serial.println(var);
+    if (var == "CONFIG")
+    {
+        DynamicJsonDocument dy = cfg.getAll();
+        JsonObject documentRoot = dy.as<JsonObject>();
+        String tr = "";
+        for (JsonPair keyValue : documentRoot)
+        {
+            String v = dy[keyValue.key()];
+            String k = keyValue.key().c_str();
+            tr += "<tr><td>" + k + "</td><td> <label id=" + k + "value>" + v + "</label> </td> <td> <input id = " + k + " value =\"" + v + "\"></td><td><button id=btn onClick=\"setvalue(this,'" + k + "','" + v + "')\">Set</button></td><td><button id=btn onClick=\"remove('" + k + "')\">Remove</button></td></tr>";
+        }
+        tr += "<tr><td>heap</td><td colspan=4>" + String(ESP.getFreeHeap()) + "</td></tr>";
+
+        return tr;
+    }
+    return String();
+}
 void setHttp()
 {
 
@@ -728,6 +887,15 @@ void setHttp()
             { 
              String re =  makestatus();
               request->send(200, "application/json", re); });
+
+ server.on("/removeconfig", HTTP_GET, [](AsyncWebServerRequest *request)
+              { 
+        String v = request->arg("configname");
+        cfg.remove(v);
+        loadconfigtoram();
+  request->send(200, "application/json", "{\"remove\":\"" + v + "\"}"); });
+  server.on("/setconfigwww", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send_P(200, "text/html", configfile_html, fillconfig); });
   server.on("/allconfig", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
               DynamicJsonDocument o  = cfg.getAll();
