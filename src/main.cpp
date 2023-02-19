@@ -20,26 +20,28 @@
 
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include "checkconnection.h"
 
 #define jsonbuffersize 1024
 void loadconfigtoram();
 void configdatatofile();
 void configwww();
 Configfile cfg("/config.cfg");
-
+WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 const String version = "96";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
 String dayStamp;
 String timeStamp;
-
+int isDisconnect = false;
+int wifitimeout = 0; // สำหรับบอกว่าหมดเวลายังที่ติดต่อ wifi ไม่ได้
 #define ADDR 100
 #define jsonsize 1500
 
 StaticJsonDocument<jsonsize> doc;
 // char jsonChar[jsonsize];
-
+int updatentptime = 0;
 int makestatuscount = 0;
 long uptime = 0;
 long otatime = 0;
@@ -55,6 +57,7 @@ long load = 0;
 long loadcount = 0;
 double loadav = 0;
 double loadtotal = 0;
+int runstatus = 0;
 #define ioport 7
 String name = "d1io";
 const String type = "D1IO";
@@ -77,10 +80,15 @@ struct
   boolean havedht = false;
   boolean haveds = false;
   boolean havea0 = false;
-  boolean havetorestart = false; //สำหรับบอกว่าถ้าติดต่อ wifi ไม่ได้ให้ restart
+  boolean havetorestart = false; // สำหรับบอกว่าถ้าติดต่อ wifi ไม่ได้ให้ restart
   boolean havesht = false;
   int restarttime = 360; // หน่วยเป็นวิ
   int maxconnecttimeout = 30;
+  int checkintime = 600;
+  int otatime = 600;
+  int ntpupdatetime = 600;
+  int wifitimeout = 60;
+  int readdhttime = 600;
 } configdata;
 class Dhtbuffer
 {
@@ -142,6 +150,12 @@ void loadconfigtoram()
   configdata.havesht = cfg.getIntConfig("havesht", 0);
   configdata.havetorestart = cfg.getIntConfig("havetorestart", 0);
   configdata.maxconnecttimeout = cfg.getIntConfig("maxconnecttimeout", 60);
+  configdata.checkintime = cfg.getIntConfig("checkintime", 600);
+  configdata.otatime = cfg.getIntConfig("otatime", 600);
+  configdata.ntpupdatetime = cfg.getIntConfig("ntpupdatetime", 600);
+  configdata.wifitimeout = cfg.getIntConfig("wifitimeout", 60);
+  configdata.readdhttime = cfg.getIntConfig("readdhttime", 60);
+  otahost = cfg.getConfig("otahost", "point.pixka.me");
 }
 
 void configdatatofile()
@@ -263,7 +277,9 @@ void ota()
 {
   WiFiClient client;
   Serial.println("CALL " + otahost + " " + updateString);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client, otahost, 8080, updateString, version.c_str());
+  String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2000/rest/fw/update/d1io/");
+  String url = urlfromfile + version;
+  t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
   switch (ret)
   {
   case HTTP_UPDATE_FAILED:
@@ -409,41 +425,35 @@ String makestatus()
   dd["time"] = timeStamp;
   dd["load"] = load;
   dd["loadav"] = loadav;
+  dd["status"] = runstatus;
   serializeJson(dd, b, jsonbuffersize);
   return String(b);
 }
-// void status()
-// {
-//   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-//   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-//   server.sendHeader("Access-Control-Allow-Headers", "application/json");
-//   String b = makestatus();
-//   server.send(200, "application/json", b);
-// }
-// void setclosetime()
-// {
-//   char b[jsonbuffersize];
-//   int s = server.arg("time").toInt();
-//   digitalWrite(D5, 1);
-//   String closetime = server.arg("closetime");
-//   ports[2].delay = s;
-//   ports[2].value = 1;
-//   ports[2].closetime = closetime;
-//   DynamicJsonDocument d(jsonbuffersize);
-//   d["run"] = "ok";
-//   d["countime"] = s;
-//   d["closeat"] = closetime;
-//   serializeJson(d, b, jsonbuffersize);
-//   server.send(200, "application/json", b);
-// }
 
+// int talktoServer(String ip, String name, long uptime)
+// {
+//   String talkurl = cfg.getConfig("talkurl", "http://192.168.88.21:3334/hello");
+//   WiFiClient client;
+//   HTTPClient http;
+
+//   // HTTPClient http; // Declare object of class HTTPClient
+//   // String h = cfg.getConfig("checkinurl", "http://192.168.88.225:888/hello");
+//   // int httpCode = http.GET(h);        // Send the request
+//   // String payload = http.getString(); // Get the response payload
+//   Serial.print(" Http Code:");
+//   http.begin(client, talkurl + "/" + ip + "/" + uptime + "/" + name + "");
+//   int httpResponseCode = http.GET();
+//   Serial.println(httpResponseCode);
+//   Serial.println(http.getString());
+//   return httpResponseCode;
+// }
 void checkin()
 {
   DynamicJsonDocument dy(jsonbuffersize);
   char b[jsonbuffersize];
   WiFiClient client;
   int connectcount = 0;
-  if (WiFiMulti.run() != WL_CONNECTED) //รอการเชื่อมต่อ
+  if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
   {
     return;
   }
@@ -459,7 +469,7 @@ void checkin()
   //"http://" + hosttraget + "/checkin";
   http.begin(client, h);                              // Specify request destination
   http.addHeader("Content-Type", "application/json"); // Specify content-type header
-  http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
+  // http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
 
   int httpCode = http.POST(b);       // Send the request
   String payload = http.getString(); // Get the response payload
@@ -548,6 +558,7 @@ void addTorun(int port, int delay, int value, int wait)
 {
   if (delay > counttime)
     counttime = delay;
+  runstatus = 1;
   for (int i = 0; i < ioport; i++)
   {
     if (ports[i].port == port)
@@ -570,12 +581,17 @@ void addTorun(int port, int delay, int value, int wait)
 void flip()
 {
   makestatuscount++;
-  uptime++;      //เวลา run
-  otatime++;     //เพิ่มการ update
-  checkintime++; //เพิ่มการนับ
-  porttrick++;   //บอกว่า 1 วิละ
-  readdhttime++; //บอกเวลา สำหรับอ่าน DHT
+  uptime++;      // เวลา run
+  otatime++;     // เพิ่มการ update
+  checkintime++; // เพิ่มการนับ
+  porttrick++;   // บอกว่า 1 วิละ
+  readdhttime++; // บอกเวลา สำหรับอ่าน DHT
   restarttime++;
+  updatentptime++; // สำหรับบอกให้ update เวลาใหม่
+  if (isDisconnect)
+  {
+    wifitimeout++;
+  }
   if (apmode)
     apmodetimeout++;
   if (counttime > 0)
@@ -595,7 +611,7 @@ void portcheck()
     {
       ports[i].delay--;
       Serial.print("Port  ");
-      Serial.println(ports[i].port);
+      Serial.print(ports[i].port);
       Serial.print(" Delay ");
       Serial.println(ports[i].delay);
       if (ports[i].delay == 0)
@@ -604,6 +620,8 @@ void portcheck()
         digitalWrite(ports[i].port, !ports[i].value);
         Serial.println("End job");
       }
+      else
+        runstatus = 1;
     }
 
     if (ports[i].delay == 0)
@@ -612,7 +630,7 @@ void portcheck()
 }
 /**
  * @brief setup port mode
- * 
+ *
  */
 void setupport()
 {
@@ -862,23 +880,23 @@ New Config <input id=newconfigname> <input id=newvalue> <button  id=btn onClick=
 </body></html>)rawliteral";
 String fillconfig(const String &var)
 {
-    // Serial.println(var);
-    if (var == "CONFIG")
+  // Serial.println(var);
+  if (var == "CONFIG")
+  {
+    DynamicJsonDocument dy = cfg.getAll();
+    JsonObject documentRoot = dy.as<JsonObject>();
+    String tr = "";
+    for (JsonPair keyValue : documentRoot)
     {
-        DynamicJsonDocument dy = cfg.getAll();
-        JsonObject documentRoot = dy.as<JsonObject>();
-        String tr = "";
-        for (JsonPair keyValue : documentRoot)
-        {
-            String v = dy[keyValue.key()];
-            String k = keyValue.key().c_str();
-            tr += "<tr><td>" + k + "</td><td> <label id=" + k + "value>" + v + "</label> </td> <td> <input id = " + k + " value =\"" + v + "\"></td><td><button id=btn onClick=\"setvalue(this,'" + k + "','" + v + "')\">Set</button></td><td><button id=btn onClick=\"remove('" + k + "')\">Remove</button></td></tr>";
-        }
-        tr += "<tr><td>heap</td><td colspan=4>" + String(ESP.getFreeHeap()) + "</td></tr>";
-
-        return tr;
+      String v = dy[keyValue.key()];
+      String k = keyValue.key().c_str();
+      tr += "<tr><td>" + k + "</td><td> <label id=" + k + "value>" + v + "</label> </td> <td> <input id = " + k + " value =\"" + v + "\"></td><td><button id=btn onClick=\"setvalue(this,'" + k + "','" + v + "')\">Set</button></td><td><button id=btn onClick=\"remove('" + k + "')\">Remove</button></td></tr>";
     }
-    return String();
+    tr += "<tr><td>heap</td><td colspan=4>" + String(ESP.getFreeHeap()) + "</td></tr>";
+
+    return tr;
+  }
+  return String();
 }
 void setHttp()
 {
@@ -888,14 +906,14 @@ void setHttp()
              String re =  makestatus();
               request->send(200, "application/json", re); });
 
- server.on("/removeconfig", HTTP_GET, [](AsyncWebServerRequest *request)
-              { 
+  server.on("/removeconfig", HTTP_GET, [](AsyncWebServerRequest *request)
+            { 
         String v = request->arg("configname");
         cfg.remove(v);
         loadconfigtoram();
   request->send(200, "application/json", "{\"remove\":\"" + v + "\"}"); });
   server.on("/setconfigwww", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/html", configfile_html, fillconfig); });
+            { request->send_P(200, "text/html", configfile_html, fillconfig); });
   server.on("/allconfig", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
               DynamicJsonDocument o  = cfg.getAll();
@@ -989,7 +1007,7 @@ void setHttp()
   // server.on("/setvalue", setvalue);
   // server.on("/setclosetime", setclosetime);
   // server.on("/resettodefault", resettodefault);
-  server.begin(); //เปิด TCP Server
+  server.begin(); // เปิด TCP Server
   Serial.println("Server started");
 }
 void Apmoderun()
@@ -1012,7 +1030,7 @@ void wificonnect()
   Serial.print("connect.");
   int ft = 0;
   // display.clear();
-  while (WiFi.status() != WL_CONNECTED) //รอการเชื่อมต่อ
+  while (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
   {
     delay(250);
 
@@ -1039,6 +1057,20 @@ void wificonnect()
     Serial.println(mac); // แสดงหมายเลข IP ของ Server
   }
 }
+void setWifiEvent()
+{
+  gotIpEventHandler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &event)
+                                              {
+    Serial.print("Station connected, IP: ");
+    Serial.println(WiFi.localIP()); 
+    isDisconnect=false; 
+    wifitimeout = 0; });
+
+  disconnectedEventHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &event)
+                                                            { 
+                                                                Serial.println("Station disconnected");
+                                                               isDisconnect = true; });
+}
 void setup()
 {
   Serial.begin(9600);
@@ -1063,17 +1095,7 @@ void setup()
   timeClient.begin();
   timeClient.setTimeOffset(25200); // Thailand +7 = 25200
 }
-// void configwww()
-// {
 
-//   DynamicJsonDocument d = cfg.getAll();
-//   int size = d.capacity();
-//   char buf[size];
-//   serializeJsonPretty(d, buf, size);
-//   Serial.print("Size:");
-//   Serial.println(size);
-//   server.send(200, "application/json", buf);
-// }
 void printIPAddressOfHost(const char *host)
 {
   IPAddress resolvedIP;
@@ -1085,7 +1107,7 @@ void printIPAddressOfHost(const char *host)
     if (restarttime > configdata.restarttime && configdata.havetorestart)
       ESP.reset();
   }
-  restarttime = 0; //ติดต่อได้ก็ reset ไปเลย
+  restarttime = 0; // ติดต่อได้ก็ reset ไปเลย
   Serial.print(host);
   Serial.print(" IP: ");
   Serial.println(resolvedIP);
@@ -1095,20 +1117,19 @@ void loop()
   // long s = millis();
   // server.handleClient();
   // t.update();
-  if (checkintime > cfg.getIntConfig("checkintime", 600) && counttime < 1)
+  if (checkintime > configdata.checkintime && counttime < 1)
   {
     checkintime = 0;
     checkin();
   }
-  if (otatime > cfg.getIntConfig("otatime", 1500) && counttime < 1)
+  if (otatime > configdata.otatime && counttime < 1)
   {
-    updateNTP();
-    if (WiFiMulti.run() == WL_CONNECTED)
-    {
-      WiFi.softAPdisconnect(true);
-    }
+
     otatime = 0;
     ota();
+  }
+  if (updatentptime > configdata.ntpupdatetime)
+  {
   }
   if (porttrick > 0 && counttime >= 0)
   {
@@ -1116,36 +1137,26 @@ void loop()
     portcheck();
   }
 
-  if (configdata.havedht && readdhttime > cfg.getIntConfig("readdhttime", 120) && dhtbuffer.count < 1)
+  if (configdata.havedht && readdhttime > configdata.readdhttime && dhtbuffer.count < 1)
   {
     readdhttime = 0;
     message = "Read DHT";
     readDHT();
   }
 
-  if (configdata.havetorestart && restarttime > cfg.getIntConfig("checkconnection", 600))
-  { //ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
-    // printIPAddressOfHost("fw.pixka.me");
-    if (!Ping.ping(WiFi.gatewayIP()))
+  if (configdata.havetorestart && wifitimeout > configdata.wifitimeout)
+  { // ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
+    int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
+
+    if (re != 200 && configdata.havetorestart)
     {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.reconnect();
+      ESP.restart();
     }
-    restarttime = 0;
+    wifitimeout = 0;
   }
 
   if (apmodetimeout > cfg.getIntConfig("reconnecttime", 300))
   {
     WiFi.reconnect();
   }
-  // if (makestatuscount > 2)
-  // {
-  //   makestatus();
-  //   makestatuscount = 0;
-  // }
-  // load = millis() - s;
-  // loadcount++;
-  // loadtotal += load;
-  // loadav = loadtotal / loadcount;
 }
