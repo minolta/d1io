@@ -5,7 +5,6 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include "Apmode.h"
-// #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266httpUpdate.h>
@@ -23,12 +22,15 @@
 #include "checkconnection.h"
 
 #define jsonbuffersize 1024
+const String version = "97";
+String name = "d1io";
+const String type = "D1IO";
 void loadconfigtoram();
 void configdatatofile();
 void configwww();
 Configfile cfg("/config.cfg");
 WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
-const String version = "96";
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -59,8 +61,7 @@ double loadav = 0;
 double loadtotal = 0;
 int runstatus = 0;
 #define ioport 7
-String name = "d1io";
-const String type = "D1IO";
+
 
 extern "C"
 {
@@ -277,7 +278,7 @@ void ota()
 {
   WiFiClient client;
   Serial.println("CALL " + otahost + " " + updateString);
-  String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2000/rest/fw/update/d1io/");
+  String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2005/rest/fw/update/d1io/");
   String url = urlfromfile + version;
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
   switch (ret)
@@ -426,7 +427,7 @@ String makestatus()
   dd["load"] = load;
   dd["loadav"] = loadav;
   dd["status"] = runstatus;
-  serializeJson(dd, b, jsonbuffersize);
+  serializeJsonPretty(dd, b, jsonbuffersize);
   return String(b);
 }
 
@@ -452,7 +453,6 @@ void checkin()
   DynamicJsonDocument dy(jsonbuffersize);
   char b[jsonbuffersize];
   WiFiClient client;
-  int connectcount = 0;
   if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
   {
     return;
@@ -940,7 +940,7 @@ void setHttp()
     dy["ntptime"] = timeClient.getFormattedTime();
     dy["ntptimelong"] = timeClient.getEpochTime();
 
-    serializeJson(dy, b, jsonbuffersize);
+    serializeJsonPretty(dy, b, jsonbuffersize);
     request->send(200, "application/json", b);
     for (int i = 0; i < 40; i++)
     {
@@ -970,13 +970,13 @@ void setHttp()
   dy["mac"] = WiFi.macAddress();
   dy["ip"] = WiFi.localIP().toString();
   dy["uptime"] = uptime;
-  serializeJson(dy, b, jsonbuffersize);
+  serializeJsonPretty(dy, b, jsonbuffersize);
    request->send(200, "application/json", b); });
   server.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
             char b[jsonbuffersize];
   DynamicJsonDocument configbuf = cfg.getAll();
-  serializeJson(configbuf, b, jsonbuffersize);
+  serializeJsonPretty(configbuf, b, jsonbuffersize);
   Serial.println(b);
   Serial.println("get all config file");
               request->send(200, "application/json", b); });
@@ -986,27 +986,6 @@ void setHttp()
   String value = request->arg("value");
   cfg.addConfig(v, value);
   request->send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}"); });
-  // server.send(200, "application/json", b);
-
-  // server.on("/run", run);
-  // server.on("/ssid", ssid);
-  // server.on("/status", status);
-  // server.on("/dht", DHTtoJSON);
-  // server.on("/ota", trytoota);
-  // server.on("/update", trytoota);
-  // server.on("/setwifi", setwifi);
-  // server.on("/get", get);
-  // server.on("/setconfig", setconfig);
-  // server.on("/configfile", configfile);
-  // server.on("/setconfigfile", setConfigfile);
-  // server.on("/config", configwww);
-  // server.on("/setp", setp);
-  // server.on("/", status);
-  // server.on("/reset", reset);
-  // server.on("/restart", reset);
-  // server.on("/setvalue", setvalue);
-  // server.on("/setclosetime", setclosetime);
-  // server.on("/resettodefault", resettodefault);
   server.begin(); // เปิด TCP Server
   Serial.println("Server started");
 }
@@ -1057,22 +1036,10 @@ void wificonnect()
     Serial.println(mac); // แสดงหมายเลข IP ของ Server
   }
 }
-void setWifiEvent()
-{
-  gotIpEventHandler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &event)
-                                              {
-    Serial.print("Station connected, IP: ");
-    Serial.println(WiFi.localIP()); 
-    isDisconnect=false; 
-    wifitimeout = 0; });
 
-  disconnectedEventHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &event)
-                                                            { 
-                                                                Serial.println("Station disconnected");
-                                                               isDisconnect = true; });
-}
 void setup()
 {
+  
   Serial.begin(9600);
   cfg.setbuffer(jsonbuffersize);
   if (!cfg.openFile())
@@ -1082,6 +1049,7 @@ void setup()
   loadconfigtoram();
   setupport();
   setport();
+  flipper.attach(1, flip);
   Serial.println();
   Serial.println("-----------------------------------------------");
   Serial.println(cfg.getConfig("ssid"));
@@ -1090,7 +1058,7 @@ void setup()
 
   wificonnect();
   setHttp();
-  flipper.attach(1, flip);
+
   dht.begin();
   timeClient.begin();
   timeClient.setTimeOffset(25200); // Thailand +7 = 25200
@@ -1112,38 +1080,41 @@ void printIPAddressOfHost(const char *host)
   Serial.print(" IP: ");
   Serial.println(resolvedIP);
 }
-void loop()
+void checkintask()
 {
-  // long s = millis();
-  // server.handleClient();
-  // t.update();
   if (checkintime > configdata.checkintime && counttime < 1)
   {
     checkintime = 0;
     checkin();
   }
+}
+void otatask()
+{
   if (otatime > configdata.otatime && counttime < 1)
   {
-
     otatime = 0;
     ota();
   }
-  if (updatentptime > configdata.ntpupdatetime)
-  {
-  }
+}
+void checkport()
+{
   if (porttrick > 0 && counttime >= 0)
   {
     porttrick = 0;
     portcheck();
   }
-
+}
+void dhttask()
+{
   if (configdata.havedht && readdhttime > configdata.readdhttime && dhtbuffer.count < 1)
   {
     readdhttime = 0;
     message = "Read DHT";
     readDHT();
   }
-
+}
+void checkconneciontask()
+{
   if (configdata.havetorestart && wifitimeout > configdata.wifitimeout)
   { // ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
     int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
@@ -1154,9 +1125,22 @@ void loop()
     }
     wifitimeout = 0;
   }
+}
+void loop()
+{
+  checkintask();
+  otatask();
+  checkport();
+  dhttask();
+  checkconneciontask();
+  // if (updatentptime > configdata.ntpupdatetime)
+  // {
+  // }
 
-  if (apmodetimeout > cfg.getIntConfig("reconnecttime", 300))
-  {
-    WiFi.reconnect();
-  }
+  
+
+  // if (apmodetimeout > cfg.getIntConfig("reconnecttime", 300))
+  // {
+  //   WiFi.reconnect();
+  // }
 }
