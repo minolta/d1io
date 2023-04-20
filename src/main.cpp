@@ -21,15 +21,14 @@
 #include <ESPAsyncWebServer.h>
 #include "checkconnection.h"
 
-#define jsonbuffersize 1024
-const String version = "97";
+#define jsonbuffersize 2048
+const String version = "101";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
 void configdatatofile();
 void configwww();
 Configfile cfg("/config.cfg");
-WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
@@ -61,7 +60,6 @@ double loadav = 0;
 double loadtotal = 0;
 int runstatus = 0;
 #define ioport 7
-
 
 extern "C"
 {
@@ -277,9 +275,11 @@ void updateNTP()
 void ota()
 {
   WiFiClient client;
-  Serial.println("CALL " + otahost + " " + updateString);
+
   String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2005/rest/fw/update/d1io/");
+
   String url = urlfromfile + version;
+  Serial.println("CALL " + url);
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
   switch (ret)
   {
@@ -296,16 +296,7 @@ void ota()
     break;
   }
 }
-// void setp()
-// {
-//   String configname = server.arg("configname");
-//   String value = server.arg("value");
 
-//   cfg.addConfig(configname, value);
-//   char buf[500];
-//   sprintf(buf, "{\"configname\":\"%s\" , \"value\":\"%s\"}", configname, value);
-//   server.send(200, "application/json", buf);
-// }
 void trytoota()
 {
   // String re = "";
@@ -343,29 +334,6 @@ void trytoota()
   // server.send(200, "application/json", jsonChar);
 }
 
-// void get()
-// {
-//   String ssd = server.arg("ssid");
-//   String password = server.arg("password");
-//   Serial.print("SSD ");
-//   Serial.println(ssd);
-//   Serial.print("password ");
-//   Serial.println(password);
-//   cfg.addConfig("ssid", ssd);
-//   cfg.addConfig("password", password);
-//   loadconfigtoram();
-//   // if (ssd != NULL)
-//   //   ssd.toCharArray(wifidata.ssid, 50);
-
-//   // if (password != NULL)
-//   //   password.toCharArray(wifidata.password, 50);
-
-//   Serial.println("Set ok");
-//   // EEPROM.put(ADDR, wifidata);
-//   // EEPROM.commit();
-//   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set WIFI TO " + ssd + " <h3><hr><a href='/setconfig'>back</a></html>";
-//   server.send(200, "text/html", re);
-// }
 String makestatus()
 {
   char b[jsonbuffersize];
@@ -431,23 +399,6 @@ String makestatus()
   return String(b);
 }
 
-// int talktoServer(String ip, String name, long uptime)
-// {
-//   String talkurl = cfg.getConfig("talkurl", "http://192.168.88.21:3334/hello");
-//   WiFiClient client;
-//   HTTPClient http;
-
-//   // HTTPClient http; // Declare object of class HTTPClient
-//   // String h = cfg.getConfig("checkinurl", "http://192.168.88.225:888/hello");
-//   // int httpCode = http.GET(h);        // Send the request
-//   // String payload = http.getString(); // Get the response payload
-//   Serial.print(" Http Code:");
-//   http.begin(client, talkurl + "/" + ip + "/" + uptime + "/" + name + "");
-//   int httpResponseCode = http.GET();
-//   Serial.println(httpResponseCode);
-//   Serial.println(http.getString());
-//   return httpResponseCode;
-// }
 void checkin()
 {
   DynamicJsonDocument dy(jsonbuffersize);
@@ -465,7 +416,7 @@ void checkin()
   serializeJsonPretty(doc, b, jsonbuffersize);
   // put your main code here, to run repeatedly:
   HTTPClient http; // Declare object of class HTTPClient
-  String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/checkin");
+  String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/rest/piserver/checkin");
   //"http://" + hosttraget + "/checkin";
   http.begin(client, h);                              // Specify request destination
   http.addHeader("Content-Type", "application/json"); // Specify content-type header
@@ -660,86 +611,6 @@ String intToEnable(int i)
     return String("Enable");
   }
 }
-// void setconfig()
-// {
-//   String html = " <!DOCTYPE html> <style> table { font-family: \"Trebuchet MS\", Arial, Helvetica, sans-serif; border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } tr:nth-child(even) { background-color: #f2f2f2; } tr:hover { background-color: #ddd; } th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #4CAF50; color: white; } button { /* width: 100%; */ background-color: #4CAF50; color: white; padding: 10px 15px; /* margin: 8px 0; */ border: none; border-radius: 4px; cursor: pointer; } .button3 { background-color: #f44336; } </style> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <meta charset=\"UTF-8\"> </head> Config in " + String(name) + " version:" + String(version) + " SSID:" + cfg.getConfig("ssid") + " Signel: " + String(WiFi.RSSI()) + " type:" + String(type) + " <table id=\"customres\"> <tr> <td>Parameter</td> <td>value</td> <td>Option</td> </tr> <tr> <td>DHT</td> <td>" + intToEnable(configdata.havedht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havedht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\" value=\"1\">Disable</button> </form> </td> </tr> <tr> <td>SHT</td> <td>" + intToEnable(configdata.havesht) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havesht\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>DS</td> <td>" + intToEnable(configdata.haveds) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"haveds\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>A0</td> <td>" + intToEnable(configdata.havea0) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havea0\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Have to restart</td> <td>" + intToEnable(configdata.havetorestart) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"1\"> <button type=\"submit\" value=\"1\">Enable</button> </form> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"havetorestart\"> <input type=\"hidden\" name=\"value\" value=\"0\"> <button type=\"submit\" class=\"button3\">Disable</button> </form> </td> </tr> <tr> <td>Sensor value </td> <td>" + String(configdata.sensorvalue) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"sensorvalue\"> <input type=\"number\" name=\"value\" value=\"{{valuesesnsor}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> <tr> <td>Auto restart value </td> <td>" + String(configdata.restarttime) + "</td> <td> <form action=\"/setvalue\"> <input type=\"hidden\" name=\"p\" value=\"restarttime\"> <input type=\"number\" name=\"value\" value=\"{{valuerestarttime}}\"> <button type=\"submit\" value=\"1\">Save</button> </form> </td> </tr> </table> <hr> <form action=\"/get\"> <table> <tr> <td colspan=\"3\">WIFI information</td> </tr> <tr> <td>SSID</td> <td>" + cfg.getConfig("ssid") + "</td> <td><input type=\"text\" name=\"ssid\"></td> </tr> <tr> <td>PASSWORD</td> <td>********</td> <td><input type=\"password\" name=\"password\"></td> </tr> <tr> <td colspan=\"3\" align=\"right\"><button type=\"submit\">Set wifi</button></td> </tr> </table> </form> <form action=\"/restart\"> <button type=\"submit\" class=\"button3\" value=\"Restart\">Restart</button> </form> ky@pixka.me 2020 </html>";
-//   server.send(200, "text/html", html);
-// }
-// void setvalue()
-// {
-//   String v = server.arg("p");
-//   String value = server.arg("value");
-//   String value2 = server.arg("value2");
-//   Serial.print("Set config:");
-//   Serial.print(v);
-//   Serial.printf("to %s", value.c_str());
-//   if (v.equals("va0"))
-//   {
-//     configdata.va0 = value.toFloat();
-//     cfg.addConfig("va0", configdata.va0);
-//   }
-//   else if (v.equals("sensorvalue"))
-//   {
-//     configdata.sensorvalue = value.toFloat();
-//     cfg.addConfig("senservalue", configdata.sensorvalue);
-//   }
-//   else if (v.equals("havedht"))
-//   {
-//     configdata.havedht = value.toInt();
-//     cfg.addConfig("havedht", configdata.havedht);
-//   }
-//   else if (v.equals("haveds"))
-//   {
-//     configdata.haveds = value.toInt();
-//     cfg.addConfig("haveds", configdata.haveds);
-//   }
-//   else if (v.equals("havea0"))
-//   {
-//     configdata.havea0 = value.toInt();
-//     cfg.addConfig("havea0", configdata.havea0);
-//   }
-//   else if (v.equals("havetorestart"))
-//   {
-//     configdata.havetorestart = value.toInt();
-//     cfg.addConfig("haverestart", configdata.havetorestart);
-//   }
-//   else if (v.equals("havesht"))
-//   {
-//     configdata.havesht = value.toInt();
-//     cfg.addConfig("havesht", configdata.havesht);
-//   }
-//   else if (v.equals("restarttime"))
-//   {
-//     configdata.restarttime = value.toInt();
-//     cfg.addConfig("restarttime", configdata.restarttime);
-//   }
-
-//   // configdatatofile();
-
-//   String re = "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><h3>set " + v + " TO " + value + " <h3><hr><a href='/setconfig'>back</a> <script type=\"text/JavaScript\"> redirectTime = \"1500\"; redirectURL = \"/setconfig\"; function timedRedirect() { setTimeout(\"location.href = redirectURL;\",redirectTime); } </script></html>";
-//   server.send(200, "text/html", re);
-// }
-
-// void configfile()
-// {
-//   char b[jsonbuffersize];
-//   DynamicJsonDocument configbuf = cfg.getAll();
-//   serializeJsonPretty(configbuf, b, jsonbuffersize);
-//   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-//   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-//   server.sendHeader("Access-Control-Allow-Headers", "application/json");
-//   Serial.println(b);
-//   server.send(200, "application/json", b);
-//   Serial.println("get all config file");
-// }
-// void setConfigfile()
-// {
-//   String v = server.arg("configname");
-//   String value = server.arg("value");
-//   cfg.addConfig(v, value);
-//   server.send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}");
-// }
-
 const char configfile_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html><head>
   <title>Config</title>
@@ -901,6 +772,12 @@ String fillconfig(const String &var)
 void setHttp()
 {
 
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+            { 
+             String re =  makestatus();
+              request->send(200, "application/json", re); 
+              ESP.restart(); });
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
              String re =  makestatus();
@@ -991,7 +868,7 @@ void setHttp()
 }
 void Apmoderun()
 {
-  ApMode ap("cfg.cfg");
+  ApMode ap("/config.cfg");
   ap.setApname("ESP Sensor AP Mode");
   ap.run();
 }
@@ -1039,7 +916,7 @@ void wificonnect()
 
 void setup()
 {
-  
+
   Serial.begin(9600);
   cfg.setbuffer(jsonbuffersize);
   if (!cfg.openFile())
@@ -1050,18 +927,14 @@ void setup()
   setupport();
   setport();
   flipper.attach(1, flip);
-  Serial.println();
-  Serial.println("-----------------------------------------------");
-  Serial.println(cfg.getConfig("ssid"));
-  Serial.println(cfg.getConfig("password"));
-  Serial.println("-----------------------------------------------");
 
   wificonnect();
   setHttp();
-
-  dht.begin();
+  if (configdata.havedht)
+    dht.begin();
   timeClient.begin();
   timeClient.setTimeOffset(25200); // Thailand +7 = 25200
+  ota();
 }
 
 void printIPAddressOfHost(const char *host)
@@ -1090,7 +963,7 @@ void checkintask()
 }
 void otatask()
 {
-  if (otatime > configdata.otatime && counttime < 1)
+  if (otatime > configdata.otatime)
   {
     otatime = 0;
     ota();
@@ -1133,14 +1006,4 @@ void loop()
   checkport();
   dhttask();
   checkconneciontask();
-  // if (updatentptime > configdata.ntpupdatetime)
-  // {
-  // }
-
-  
-
-  // if (apmodetimeout > cfg.getIntConfig("reconnecttime", 300))
-  // {
-  //   WiFi.reconnect();
-  // }
 }
