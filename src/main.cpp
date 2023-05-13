@@ -22,7 +22,7 @@
 #include "checkconnection.h"
 
 #define jsonbuffersize 2048
-const String version = "101";
+const String version = "102";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -413,7 +413,7 @@ void checkin()
   dy["password"] = "";
   dy["ip"] = WiFi.localIP().toString();
   dy["uptime"] = uptime;
-  serializeJsonPretty(doc, b, jsonbuffersize);
+  serializeJsonPretty(dy, b, jsonbuffersize);
   // put your main code here, to run repeatedly:
   HTTPClient http; // Declare object of class HTTPClient
   String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/rest/piserver/checkin");
