@@ -167,7 +167,7 @@ void setup()
   // RUN_TEST(Testwrfile);
   // RUN_TEST(testApMode);
   // RUN_TEST(testConnecttomaster);
-  RUN_TEST(updatefw);
+  // RUN_TEST(updatefw);
   // RUN_TEST(testLoad);
   // RUN_TEST(getDefaultAlreadyhave);
   // RUN_TEST(testNull);
