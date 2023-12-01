@@ -3,6 +3,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 #include <SPI.h>
+#include "checkconnection.h"
 #include <ESP8266httpUpdate.h>
 #define UNITY_INCLUDE_DOUBLE
 #define UNITY_DOUBLE_PRECISION 1e-12
@@ -71,7 +72,7 @@ void connect()
 {
   WiFi.mode(WIFI_STA);
 
-  WiFi.begin("forpi", "04qwerty");
+  WiFi.begin("siri", "04qwerty");
   Serial.print("connect.");
   int ft = 0;
   // display.clear();
@@ -116,36 +117,58 @@ void testApMode()
 void testConnecttomaster()
 {
   connect();
+
   WiFiClient client;
   HTTPClient http;
+  Configfile cfg = Configfile("/config.cfg");
+  cfg.openFile();
+
+  Configfile *p = &cfg;
+  long uptime = 10000;
+  String name = "test";
+
+
+  // WiFi.disconnect();
+  // if (WiFi.status() == WL_CONNECTED)
+    int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
+
+  // else
+  // {
+  //   int r = WiFi.reconnect();
+  //   Serial.println(r);
+  // }
 
   // HTTPClient http; // Declare object of class HTTPClient
   // String h = cfg.getConfig("checkinurl", "http://192.168.88.225:888/hello");
   // int httpCode = http.GET(h);        // Send the request
   // String payload = http.getString(); // Get the response payload
-  Serial.print(" Http Code:");
-  http.begin(client, "http://192.168.88.225:888/hello/192.168.0.1/10000/test");
-  int httpResponseCode = http.GET();
-  Serial.println(httpResponseCode);
-  Serial.println(http.getString());
+  // Serial.print(" Http Code:");
+  // String u = p->getConfig("y", "http://192.168.88.21:3334/hello");
+  // String url =  u + "/" + WiFi.localIP().toString() + "/" + uptime + "/" + name;
+  // Serial.println(url);
+  //                http.begin(client, url);
+  // int httpResponseCode = http.GET();
+  // Serial.println(httpResponseCode);
+  // Serial.println(http.getString());
 }
 void updatefw()
 {
   connect();
+
   WiFiClient client;
   String updateurl = "http://192.168.88.225:2000/rest/fw/update/d1io/";
-  String u  = updateurl + "0";
-// String u = "http://192.168.88.225:2000/rest/fw/update/d1io/0";
+  String u = updateurl + "0";
+  // String u = "http://192.168.88.225:2000/rest/fw/update/d1io/0";
 
   Serial.println("CALL " + u);
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, u);
   // t_httpUpdate_return ret = ESPhttpUpdate.update(client,updateurl,"0");
-    // t_httpUpdate_return ret = ESPhttpUpdate.update(client, "127.0.0.1", 2000, "/rest/fw/update/d1io/0", "0");
+  // t_httpUpdate_return ret = ESPhttpUpdate.update(client, "127.0.0.1", 2000, "/rest/fw/update/d1io/0", "0");
   switch (ret)
   {
   case HTTP_UPDATE_FAILED:
     // Serial.println("[update] Update failed.");
-     Serial.printf("[update] Update failed (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+    Serial.printf("[update] Update failed (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
     break;
   case HTTP_UPDATE_NO_UPDATES:
     Serial.println("[update] Update no Update.");
@@ -155,9 +178,62 @@ void updatefw()
     break;
   }
 }
+void testCheckin()
+{
+  connect();
+
+  HTTPClient http;
+  Configfile cfg = Configfile("/config.cfg");
+  cfg.setbuffer(4048);
+  cfg.openFile();
+  int jsonbuffersize = 2048;
+  DynamicJsonDocument dy(jsonbuffersize);
+  char b[jsonbuffersize];
+  WiFiClient client;
+  if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
+  {
+    return;
+  }
+  boolean busy = true;
+  dy["mac"] = WiFi.macAddress();
+  dy["password"] = "";
+  dy["ip"] = WiFi.localIP().toString();
+  dy["uptime"] = 10000;
+  serializeJsonPretty(dy, b, jsonbuffersize);
+  Serial.println(b);
+  // put your main code here, to run repeatedly:
+  String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/rest/piserver/checkin");
+  Serial.println(h);
+  //"http://" + hosttraget + "/checkin";
+
+  http.begin(client, h);                              // Specify request destination
+  http.addHeader("Content-Type", "application/json"); // Specify content-type header
+  // http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
+  int httpCode = http.POST(b);       // Send the request
+  String payload = http.getString(); // Get the response payload
+  Serial.print(" Http Code:");
+  Serial.println(httpCode); // Print HTTP return code
+  if (httpCode == 200)
+  {
+    DynamicJsonDocument bbb(jsonbuffersize);
+    Serial.print(" Play load:");
+    Serial.println(payload); // Print request response payload
+    deserializeJson(bbb, payload);
+    // JsonObject obj = bbb.as<JsonObject>();
+    // String name = bbb["name"].as<String>();
+    String name = bbb["name"];
+    cfg.addConfig("name", name);
+    Serial.println(name);
+  }
+
+  http.end(); // Close connection
+  busy = false;
+}
 void setup()
 {
 
+  Configfile cfg = Configfile("/config.cfg");
+  cfg.openFile();
   Serial.begin(9600);
   // NOTE!!! Wait for >2 secs
   // if board doesn't support software reset via Serial.DTR/RTS
@@ -166,7 +242,7 @@ void setup()
   UNITY_BEGIN();
   // RUN_TEST(Testwrfile);
   // RUN_TEST(testApMode);
-  // RUN_TEST(testConnecttomaster);
+  RUN_TEST(testConnecttomaster);
   // RUN_TEST(updatefw);
   // RUN_TEST(testLoad);
   // RUN_TEST(getDefaultAlreadyhave);
@@ -188,6 +264,7 @@ void setup()
   // RUN_TEST(TestAddConfig);
   // RUN_TEST(TestGetvalue);
   // RUN_TEST(havefile);
+  // RUN_TEST(testCheckin);
   // TEST_ASSERT_EQUAL(true, LITTLEFS.begin(true));
   UNITY_END();
 }

@@ -21,13 +21,14 @@
 #include <ESPAsyncWebServer.h>
 #include "checkconnection.h"
 
-#define jsonbuffersize 2048
-const String version = "106";
+#define jsonbuffersize 1024
+const String version = "116";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
 void configdatatofile();
 void configwww();
+void checkport();
 Configfile cfg("/config.cfg");
 
 WiFiUDP ntpUDP;
@@ -274,6 +275,8 @@ void updateNTP()
 }
 void ota()
 {
+  if (runstatus)
+    return; // ออกเลยถ้ามีการ run อยู่
   WiFiClient client;
 
   String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2005/rest/fw/update/d1io/");
@@ -299,45 +302,13 @@ void ota()
 
 void trytoota()
 {
-  // String re = "";
-  // t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.88.9", 8080, "/espupdate/d1io/",version.c_str());
-  // Serial.println(ret);
-  // switch (ret)
-  // {
-  // case HTTP_UPDATE_FAILED:
-  //   Serial.println("[update] Update failed.");
-  //   re = "Update failed";
-  //   break;
-  // case HTTP_UPDATE_NO_UPDATES:
-
-  //   Serial.println("[update] Update no Update.");
-  //   re = "No update";
-  //   break;
-  // case HTTP_UPDATE_OK:
-  //   Serial.println("[update] Update ok."); // may not called we reboot the ESP
-  //   re = "update ok";
-  //   break;
-  // }
-  // doc["name"] = name;
-  // doc["ip"] = WiFi.localIP().toString();
-  // doc["mac"] = WiFi.macAddress();
-  // doc["ssid"] = WiFi.SSID();
-  // doc["version"] = version;
-  // doc["h"] = pfHum;
-  // doc["t"] = pfTemp;
-  // doc["uptime"] = uptime;
-  // doc["updateresult"] = re;
-  // serializeJsonPretty(doc, jsonChar, jsonsize);
-  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  // server.sendHeader("Access-Control-Allow-Headers", "application/json");
-  // server.send(200, "application/json", jsonChar);
 }
 
 String makestatus()
 {
-  char b[jsonbuffersize];
-  DynamicJsonDocument dd(jsonbuffersize);
+  int f = 2048;
+  char b[f];
+  DynamicJsonDocument dd(f);
   dd.clear();
   dd["devicetype"] = "d1io";
   dd["name"] = name;
@@ -395,50 +366,60 @@ String makestatus()
   dd["load"] = load;
   dd["loadav"] = loadav;
   dd["status"] = runstatus;
-  serializeJsonPretty(dd, b, jsonbuffersize);
+  serializeJsonPretty(dd, b, f);
   return String(b);
 }
 
 void checkin()
 {
-  DynamicJsonDocument dy(jsonbuffersize);
-  char b[jsonbuffersize];
-  WiFiClient client;
-  if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
+  long f = system_get_free_heap_size();
+  if (!runstatus)
   {
-    return;
-  }
-  busy = true;
-  dy["mac"] = WiFi.macAddress();
-  dy["password"] = "";
-  dy["ip"] = WiFi.localIP().toString();
-  dy["uptime"] = uptime;
-  serializeJsonPretty(dy, b, jsonbuffersize);
-  // put your main code here, to run repeatedly:
-  HTTPClient http; // Declare object of class HTTPClient
-  String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/rest/piserver/checkin");
-  //"http://" + hosttraget + "/checkin";
-  http.begin(client, h);                              // Specify request destination
-  http.addHeader("Content-Type", "application/json"); // Specify content-type header
-  // http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
+    DynamicJsonDocument dy(jsonbuffersize);
+    char b[jsonbuffersize];
+    WiFiClient client;
+    if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
+    {
+      return;
+    }
+    busy = true;
+    dy["mac"] = WiFi.macAddress();
+    dy["password"] = "";
+    dy["ip"] = WiFi.localIP().toString();
+    dy["uptime"] = uptime;
+    serializeJsonPretty(dy, b, jsonbuffersize);
+    dy.clear();
+    // put your main code here, to run repeatedly:
+    HTTPClient http; // Declare object of class HTTPClient
+    String h = cfg.getConfig("checkinurl", "http://192.168.88.21:3333/rest/piserver/checkin");
+    //"http://" + hosttraget + "/checkin";
+    http.begin(client, h);                              // Specify request destination
+    http.addHeader("Content-Type", "application/json"); // Specify content-type header
+    // http.addHeader("Authorization", "Basic VVNFUl9DTElFTlRfQVBQOnBhc3N3b3Jk");
+    int httpCode = http.POST(b);       // Send the request
+    String payload = http.getString(); // Get the response payload
+    Serial.print(" Http Code:");
+    Serial.println(httpCode); // Print HTTP return code
+    if (httpCode == 200)
+    {
+      DynamicJsonDocument bbb(jsonbuffersize);
+      Serial.print(" Play load:");
+      Serial.println(payload); // Print request response payload
+      deserializeJson(bbb, payload);
+      // JsonObject obj = bbb.as<JsonObject>();
+      // String name = bbb["name"].as<String>();
+      String n = bbb["name"];
+      name = n;
+      cfg.addConfig("name", n);
+      Serial.println(name);
+    }
 
-  int httpCode = http.POST(b);       // Send the request
-  String payload = http.getString(); // Get the response payload
-  Serial.print(" Http Code:");
-  Serial.println(httpCode); // Print HTTP return code
-  if (httpCode == 200)
-  {
-    Serial.print(" Play load:");
-    Serial.println(payload); // Print request response payload
-    deserializeJson(dy, payload);
-    JsonObject obj = dy.as<JsonObject>();
-    name = obj["name"].as<String>();
-    cfg.addConfig("name", name);
+    http.end(); // Close connection
+    busy = false;
+    long l = system_get_free_heap_size();
+    Serial.print("Use ram for checkin:");
+    Serial.println(f - l);
   }
-
-  http.end(); // Close connection
-  busy = false;
-  // ota();
 }
 void setport()
 {
@@ -539,10 +520,7 @@ void flip()
   readdhttime++; // บอกเวลา สำหรับอ่าน DHT
   restarttime++;
   updatentptime++; // สำหรับบอกให้ update เวลาใหม่
-  if (isDisconnect)
-  {
-    wifitimeout++;
-  }
+  wifitimeout++;
   if (apmode)
     apmodetimeout++;
   if (counttime > 0)
@@ -552,7 +530,11 @@ void flip()
   if (canuseled)
     digitalWrite(b_led, !digitalRead(b_led)); // set pin to the opposite state
   dhtbuffer.count--;
+
+  checkport();
 }
+
+// สำหรับนับว่า port ไหนทำงานบ้าง
 void portcheck()
 {
   for (int i = 0; i < ioport; i++)
@@ -574,9 +556,6 @@ void portcheck()
       else
         runstatus = 1;
     }
-
-    if (ports[i].delay == 0)
-      ports[i].run = 0;
   }
 }
 /**
@@ -960,8 +939,8 @@ void setHttp()
 void Apmoderun()
 {
   ApMode ap("/config.cfg");
-  ap.setapmodetime(cfg.getIntConfig("apmoderun",2));
-  ap.setApname("ESP_D1IO_"+WiFi.macAddress());
+  ap.setapmodetime(cfg.getIntConfig("apmoderun", 2));
+  ap.setApname("ESP_D1IO_" + WiFi.macAddress());
   ap.run();
 }
 void wificonnect()
@@ -1010,7 +989,7 @@ void setup()
 {
 
   Serial.begin(9600);
-  cfg.setbuffer(jsonbuffersize);
+  cfg.setbuffer(2048);
   if (!cfg.openFile())
   {
     initConfig();
@@ -1018,15 +997,16 @@ void setup()
   loadconfigtoram();
   setupport();
   setport();
-  flipper.attach(1, flip);
 
   wificonnect();
   setHttp();
-  if (configdata.havedht)
-    dht.begin();
-  timeClient.begin();
-  timeClient.setTimeOffset(25200); // Thailand +7 = 25200
+  // if (configdata.havedht)
+  //   dht.begin();
+  // timeClient.begin();
+  // timeClient.setTimeOffset(25200); // Thailand +7 = 25200
   ota();
+  checkin();
+  flipper.attach(1, flip);
 }
 
 void printIPAddressOfHost(const char *host)
@@ -1051,7 +1031,7 @@ void checkinnow()
 }
 void checkintask()
 {
-  if (checkintime > configdata.checkintime && counttime < 1)
+  if (checkintime > configdata.checkintime)
   {
     checkintime = 0;
     checkin();
@@ -1084,35 +1064,56 @@ void dhttask()
 }
 void checkconneciontask()
 {
-  if (configdata.havetorestart && wifitimeout > configdata.wifitimeout)
-  { // ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
-    int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
 
-    if (re != 200 && configdata.havetorestart)
-    {
-      ESP.restart();
-    }
+  if (wifitimeout > configdata.wifitimeout && !runstatus)
+  {
     wifitimeout = 0;
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      WiFi.reconnect();
+    }
+    else if (!runstatus && wifitimeout > configdata.wifitimeout)
+    { // ใช้สำหรับ check ว่า ยังติดต่อ server ได้เปล่าถ้าได้ก็ผ่านไป
+
+      int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
+      if (re != 200 && configdata.havetorestart)
+      {
+        ESP.restart();
+      }
+    }
   }
 }
 void checkkey()
 {
-  if(Serial.available())
+  if (Serial.available())
   {
     char k = Serial.read();
 
-    if(k=='c')
+    if (k == 'c')
     {
       checkin();
+    }
+    if (k == 'o')
+    {
+      ota();
+    }
+    if (k == 't')
+    {
+      int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
+    }
+
+    if (k == 'd')
+    {
+      WiFi.disconnect();
     }
   }
 }
 void loop()
 {
+  // checkport();
   checkintask();
   otatask();
-  checkport();
-  dhttask();
+  // dhttask();
   checkconneciontask();
   checkkey();
 }
