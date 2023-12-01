@@ -478,6 +478,27 @@ int getPort(String p)
   }
   return 0;
 }
+int getPortIndex(int port)
+{
+  int index = -1;
+  for (int i = 0; i < ioport; i++)
+  {
+
+    if (ports[i].port == port)
+    {
+      index = i;
+      break;
+    }
+  }
+  return index;
+}
+void stop(int port)
+{
+  int index = getPortIndex(port);
+
+  ports[index].value = !ports[index].value;
+  ports[index].delay = 1;
+}
 /**
  * @brief สำหรับ set port ให้ทำงานตาม value และ delay
  *
@@ -506,6 +527,7 @@ void addTorun(int port, int delay, int value, int wait)
       ports[i].run = 1;
       digitalWrite(ports[i].port, value);
       Serial.println("Set port");
+      break;
     }
   }
 }
@@ -861,10 +883,15 @@ void setHttp()
   request->send(200, "application/json", "{\"remove\":\"" + v + "\"}"); });
   server.on("/setconfigwww", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/html", configfile_html, fillconfig); });
+  server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request)
+            { String p = request->arg("port");
+             int portint =  getPort(p);
+             stop(portint);
+              request->send(200, "application/json", "{\"stop\":\"" + p + "\"}"); });
   server.on("/allconfig", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
               DynamicJsonDocument o  = cfg.getAll();
-             char b[1024];
+             char b[jsonbuffersize];
               serializeJsonPretty(o,b,jsonbuffersize); 
               request->send(200, "application/json", b); });
   server.on("/run", HTTP_GET, [](AsyncWebServerRequest *request)
