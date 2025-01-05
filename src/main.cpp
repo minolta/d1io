@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 1024
-const String version = "118";
+const String version = "119";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -160,7 +160,7 @@ void loadconfigtoram()
 }
 unsigned long getUptime()
 {
-  return millis()/1000;
+  return millis() / 1000;
 }
 void configdatatofile()
 {
@@ -645,7 +645,12 @@ void setHttp()
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
              String re =  makestatus();
-              request->send(200, "application/json", re); });
+         AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  re);
+         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Max-Age", "10000");
+         response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
+         response->addHeader("Access-Control-Allow-Headers", "*");
+         request->send(response); });
 
   server.on("/removeconfig", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
@@ -687,7 +692,12 @@ void setHttp()
     dy["ntptimelong"] = timeClient.getEpochTime();
 
     serializeJsonPretty(dy, b, jsonbuffersize);
-    request->send(200, "application/json", b);
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  b);
+         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Max-Age", "10000");
+         response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
+         response->addHeader("Access-Control-Allow-Headers", "*");
+         request->send(response);
     for (int i = 0; i < 40; i++)
     {
       digitalWrite(2, !digitalRead(2));
@@ -717,7 +727,12 @@ void setHttp()
   dy["ip"] = WiFi.localIP().toString();
   dy["uptime"] = uptime;
   serializeJsonPretty(dy, b, jsonbuffersize);
-   request->send(200, "application/json", b); });
+   AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  b);
+         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Max-Age", "10000");
+         response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
+         response->addHeader("Access-Control-Allow-Headers", "*");
+         request->send(response); });
   server.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
             { 
             char b[jsonbuffersize];
