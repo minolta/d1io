@@ -164,6 +164,9 @@ var t = document.getElementById("t");
     t.innerHTML = o.t
     var h = document.getElementById("h"); 
     h.innerHTML = o.h
+
+     var fd = document.getElementById("fd"); 
+    fd.innerHTML = o.fulldate
     var version = document.getElementById("version"); 
     version.innerHTML = o.version
     var heap = document.getElementById("heap"); 
@@ -227,10 +230,11 @@ New Config <input id=newconfigname> <input id=newvalue> <button  id=btn onClick=
        <tr>
   <td>h</td><td><label id="h">0</label></td>
   </tr>
-
+       <tr>
+  <td>full date</td><td><label id="fd">0</label></td>
+  </tr>
  </table>
 </body></html>)rawliteral";
-
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html><head>
@@ -243,4 +247,4 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
-#endif 
+#endif

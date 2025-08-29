@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 1024
-const String version = "119";
+const String version = "122";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -31,7 +31,7 @@ void configdatatofile();
 void configwww();
 void checkport();
 Configfile cfg("/config.cfg");
-
+time_t realtime();
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 String formattedDate;
@@ -41,7 +41,7 @@ int isDisconnect = false;
 int wifitimeout = 0; // สำหรับบอกว่าหมดเวลายังที่ติดต่อ wifi ไม่ได้
 #define ADDR 100
 #define jsonsize 1500
-
+unsigned long timestamp, difftimevalue;
 StaticJsonDocument<jsonsize> doc;
 // char jsonChar[jsonsize];
 int updatentptime = 0;
@@ -90,6 +90,8 @@ struct
   int ntpupdatetime = 600;
   int wifitimeout = 60;
   int readdhttime = 600;
+  int timezone = 25000;
+  String updatetimestampurl;
 } configdata;
 class Dhtbuffer
 {
@@ -157,10 +159,60 @@ void loadconfigtoram()
   configdata.wifitimeout = cfg.getIntConfig("checkconnectiontime", 600);
   configdata.readdhttime = cfg.getIntConfig("readdhttime", 60);
   otahost = cfg.getConfig("otahost", "point.pixka.me");
+  configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.191/timestamp");
+  configdata.timezone = cfg.getIntConfig("timezone", 25000);
 }
 unsigned long getUptime()
 {
   return millis() / 1000;
+}
+
+void updateTime()
+{
+  WiFiClient client;
+  HTTPClient http;
+  http.begin(client, configdata.updatetimestampurl);
+
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode == 200)
+  {
+    String payload = http.getString();
+    Serial.println("HTTP Response Code: " + String(httpResponseCode));
+    Serial.println("Received JSON:");
+    Serial.println(payload);
+
+    DynamicJsonDocument ddd(200);
+    Serial.print(" Play load:");
+    deserializeJson(ddd, payload);
+    String tt = ddd["timestamp"].as<String>();
+    // --- Parse the JSON ---
+
+    char *endptr;
+    unsigned long number = strtoul(tt.c_str(), &endptr, 10);
+
+    if (*endptr == '\0')
+    {
+      Serial.print("Conversion successful: ");
+      Serial.println(number);
+      timestamp = number;
+      difftimevalue = number - (millis() / 1000);
+      timeClient.setEpochTime(number);
+    }
+    else
+    {
+      Serial.print("Conversion failed. Found non-numeric character: ");
+      Serial.println(*endptr);
+    }
+  }
+  else
+  {
+    Serial.print("HTTP request failed, error code: ");
+    Serial.print(httpResponseCode);
+    Serial.println(" "+configdata.updatetimestampurl);
+  }
+
+  http.end();
 }
 void configdatatofile()
 {
@@ -292,7 +344,24 @@ void ota()
     break;
   }
 }
+String fulldate()
+{
+  time_t t = realtime();
+  struct tm *timeinfo = localtime(&t);
 
+  char buffer[80];
+
+  // Format the time as "Thursday, August 28, 2025 16:33:25"
+  // %A = Full weekday name
+  // %B = Full month name
+  // %d = Day of the month (padded)
+  // %Y = Year with century
+  // %H = Hour (24-hour)
+  // %M = Minute (padded)
+  // %S = Second (padded)
+  strftime(buffer, sizeof(buffer), "%A, %B %d, %Y %H:%M:%S", timeinfo);
+  return String(buffer);
+}
 void trytoota()
 {
 }
@@ -353,6 +422,7 @@ String makestatus()
   dd["restarttime"] = restarttime;
   dd["ntptime"] = timeClient.getFormattedTime();
   dd["ntptimelong"] = timeClient.getEpochTime();
+  dd["fulldate"] = fulldate();
   dd["type"] = type;
   dd["datetime"] = formattedDate;
   dd["date"] = dayStamp;
@@ -362,10 +432,14 @@ String makestatus()
   dd["status"] = runstatus;
   dd["wifitimeout"] = wifitimeout;
   dd["config.connectiontime"] = configdata.wifitimeout;
+  dd["timestamp"] = timestamp;
   serializeJsonPretty(dd, b, f);
   return String(b);
 }
-
+time_t realtime()
+{
+  return (time_t)(millis() / 1000) + difftimevalue + configdata.timezone;
+}
 void checkin()
 {
   long f = system_get_free_heap_size();
@@ -804,11 +878,14 @@ void setup()
 
   Serial.begin(9600);
   cfg.setbuffer(2048);
+
   if (!cfg.openFile())
   {
     initConfig();
   }
+
   loadconfigtoram();
+  flipper.attach(1, flip);
   setupport();
   setport();
 
@@ -820,7 +897,7 @@ void setup()
   // timeClient.setTimeOffset(25200); // Thailand +7 = 25200
   ota();
   checkin();
-  flipper.attach(1, flip);
+  updateTime();
 }
 
 void printIPAddressOfHost(const char *host)
@@ -883,17 +960,29 @@ void checkconneciontask()
   if (wifitimeout > configdata.wifitimeout && !runstatus)
   {
     wifitimeout = 0;
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      WiFi.begin(cfg.getConfig("ssid", "forpi").c_str(), cfg.getConfig("password", "04qwerty").c_str());
+    }
 
-    int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
-    Serial.printf("\n Check connection return : %d\n", re);
-    if (re != 200 && configdata.havetorestart)
-    {
-      ESP.restart();
-    }
-    else
-    {
-      WiFi.reconnect();
-    }
+    // int re = talktoServer(WiFi.localIP().toString(), name, uptime, &cfg);
+    // Serial.printf("\n Check connection return : %d\n", re);
+    // if (re != 200 && configdata.havetorestart)
+    // {
+    //   ESP.restart();
+    // }
+    // else
+    // {
+    //   WiFi.reconnect();
+    // }
+  }
+}
+void checktimetask()
+{
+  if (updatentptime >= configdata.ntpupdatetime)
+  {
+    updatentptime = 0;
+    updateTime();
   }
 }
 void checkkey()
@@ -929,4 +1018,5 @@ void loop()
   // dhttask();
   checkconneciontask();
   checkkey();
+  checktimetask();
 }
