@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 1024
-const String version = "122";
+const String version = "123";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -159,7 +159,7 @@ void loadconfigtoram()
   configdata.wifitimeout = cfg.getIntConfig("checkconnectiontime", 600);
   configdata.readdhttime = cfg.getIntConfig("readdhttime", 60);
   otahost = cfg.getConfig("otahost", "point.pixka.me");
-  configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.191/timestamp");
+  configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.130/timestamp");
   configdata.timezone = cfg.getIntConfig("timezone", 25000);
 }
 unsigned long getUptime()
@@ -195,6 +195,10 @@ void updateTime()
     {
       Serial.print("Conversion successful: ");
       Serial.println(number);
+      
+    
+
+
       timestamp = number;
       difftimevalue = number - (millis() / 1000);
       timeClient.setEpochTime(number);
@@ -711,23 +715,23 @@ void setHttp()
 {
 
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
              String re =  makestatus();
-              request->send(200, "application/json", re); 
+              request->send(200, "application/json", re);
               ESP.restart(); });
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
              String re =  makestatus();
          AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  re);
-         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Allow-Origin", "*");
          response->addHeader("Access-Control-Max-Age", "10000");
          response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
          response->addHeader("Access-Control-Allow-Headers", "*");
          request->send(response); });
 
   server.on("/removeconfig", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
         String v = request->arg("configname");
         cfg.remove(v);
         loadconfigtoram();
@@ -740,13 +744,13 @@ void setHttp()
              stop(portint);
               request->send(200, "application/json", "{\"stop\":\"" + p + "\"}"); });
   server.on("/allconfig", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
               DynamicJsonDocument o  = cfg.getAll();
              char b[jsonbuffersize];
-              serializeJsonPretty(o,b,jsonbuffersize); 
+              serializeJsonPretty(o,b,jsonbuffersize);
               request->send(200, "application/json", b); });
   server.on("/run", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
                 Serial.println("Run");
   String p = request->arg("port");
   char b[jsonbuffersize];
@@ -767,7 +771,7 @@ void setHttp()
 
     serializeJsonPretty(dy, b, jsonbuffersize);
     AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  b);
-         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Allow-Origin", "*");
          response->addHeader("Access-Control-Max-Age", "10000");
          response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
          response->addHeader("Access-Control-Allow-Headers", "*");
@@ -802,13 +806,13 @@ void setHttp()
   dy["uptime"] = uptime;
   serializeJsonPretty(dy, b, jsonbuffersize);
    AsyncWebServerResponse *response = request->beginResponse(200, "application/json",  b);
-         response->addHeader("Access-Control-Allow-Origin", "*"); 
+         response->addHeader("Access-Control-Allow-Origin", "*");
          response->addHeader("Access-Control-Max-Age", "10000");
          response->addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
          response->addHeader("Access-Control-Allow-Headers", "*");
          request->send(response); });
   server.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
             char b[jsonbuffersize];
   DynamicJsonDocument configbuf = cfg.getAll();
   serializeJsonPretty(configbuf, b, jsonbuffersize);
@@ -816,7 +820,7 @@ void setHttp()
   Serial.println("get all config file");
               request->send(200, "application/json", b); });
   server.on("/setconfig", HTTP_GET, [](AsyncWebServerRequest *request)
-            { 
+            {
          String v = request->arg("configname");
   String value = request->arg("value");
   cfg.addConfig(v, value);
