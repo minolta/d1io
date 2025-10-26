@@ -165,6 +165,9 @@ var t = document.getElementById("t");
     var h = document.getElementById("h"); 
     h.innerHTML = o.h
 
+   var a0 = document.getElementById("a0"); 
+    a0.innerHTML = o.a0
+
      var fd = document.getElementById("fd"); 
     fd.innerHTML = o.fulldate
     var version = document.getElementById("version"); 

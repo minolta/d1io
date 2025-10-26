@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 1024
-const String version = "123";
+const String version = "125";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -62,6 +62,16 @@ double loadav = 0;
 double loadtotal = 0;
 int runstatus = 0;
 #define ioport 7
+#define drySoil 590 // Example dry value (in air)
+#define wetSoil 273 // Example wet value (in cup of water)
+
+const int soisensorPin = A0; // Connect the sensor's AOUT pin to Arduino Analog pin A0
+int AirValue = 840;
+
+// WaterValue: The raw sensor reading when the probe is placed in a glass of water.
+// This value is treated as 100% moisture.
+int WaterValue = 470;
+// boolean checkconnect();
 
 extern "C"
 {
@@ -91,6 +101,7 @@ struct
   int wifitimeout = 60;
   int readdhttime = 600;
   int timezone = 25000;
+  int havesoisensor = 0;
   String updatetimestampurl;
 } configdata;
 class Dhtbuffer
@@ -161,12 +172,25 @@ void loadconfigtoram()
   otahost = cfg.getConfig("otahost", "point.pixka.me");
   configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.130/timestamp");
   configdata.timezone = cfg.getIntConfig("timezone", 25000);
+  configdata.havesoisensor = cfg.getIntConfig("havesoisensor", 0);
+  AirValue = cfg.getIntConfig("airvalue", 840);
+  WaterValue = cfg.getIntConfig("watervalue", 470);
 }
 unsigned long getUptime()
 {
   return millis() / 1000;
 }
-
+void havesoi()
+{
+  if (configdata.havesoisensor)
+  {
+    int moisture = analogRead(soisensorPin);
+    a0value = moisture;
+    int moisturePercent = map(moisture, AirValue, WaterValue, 0, 100);
+    pfHum = moisturePercent;
+    delay(100);
+  }
+}
 void updateTime()
 {
   WiFiClient client;
@@ -195,9 +219,6 @@ void updateTime()
     {
       Serial.print("Conversion successful: ");
       Serial.println(number);
-      
-    
-
 
       timestamp = number;
       difftimevalue = number - (millis() / 1000);
@@ -213,7 +234,7 @@ void updateTime()
   {
     Serial.print("HTTP request failed, error code: ");
     Serial.print(httpResponseCode);
-    Serial.println(" "+configdata.updatetimestampurl);
+    Serial.println(" " + configdata.updatetimestampurl);
   }
 
   http.end();
@@ -437,6 +458,7 @@ String makestatus()
   dd["wifitimeout"] = wifitimeout;
   dd["config.connectiontime"] = configdata.wifitimeout;
   dd["timestamp"] = timestamp;
+  dd["a0"]=a0value;
   serializeJsonPretty(dd, b, f);
   return String(b);
 }
@@ -623,7 +645,7 @@ void flip()
     counttime--;
 
   // get the current state of GPIO1 pin
-  if (canuseled)
+  if (canuseled && !apmode)
     digitalWrite(b_led, !digitalRead(b_led)); // set pin to the opposite state
   dhtbuffer.count--;
 
@@ -711,9 +733,32 @@ String fillconfig(const String &var)
   }
   return String();
 }
-void setHttp()
+void finddry(AsyncWebServerRequest *request)
 {
 
+    int dryvalue = analogRead(soisensorPin);
+    String s = "{\"airvalue\":" + String(dryvalue) + String("}");
+    cfg.addConfig("airvalue",dryvalue);
+    AirValue =  dryvalue;
+    request->send(200, "application/json", s);
+
+    // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
+}
+void findwet(AsyncWebServerRequest *request)
+{
+
+    int wetvalue = analogRead(soisensorPin);
+    String s = "{\"wetvalue\":" + String(wetvalue) + String("}");
+    cfg.addConfig("wetvalue",wetvalue);
+    WaterValue =  wetvalue;
+    request->send(200, "application/json", s);
+
+    // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
+}
+void setHttp()
+{
+  server.on("/findair", finddry);
+  server.on("/findwet", findwet);
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
             {
              String re =  makestatus();
@@ -825,11 +870,13 @@ void setHttp()
   String value = request->arg("value");
   cfg.addConfig(v, value);
   request->send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}"); });
+
   server.begin(); // เปิด TCP Server
   Serial.println("Server started");
 }
 void Apmoderun()
 {
+  digitalWrite(b_led, 0);
   ApMode ap("/config.cfg");
   ap.setapmodetime(cfg.getIntConfig("apmoderun", 2));
   ap.setApname("ESP_D1IO_" + WiFi.macAddress());
@@ -858,6 +905,7 @@ void wificonnect()
     {
       Serial.println("Connect main wifi timeout");
       apmode = 1;
+      digitalWrite(b_led, 1);
       break;
     }
     Serial.print(".");
@@ -1023,4 +1071,5 @@ void loop()
   checkconneciontask();
   checkkey();
   checktimetask();
+  havesoi();
 }
