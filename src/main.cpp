@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 1024
-const String version = "125";
+const String version = "128";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -61,6 +61,7 @@ long loadcount = 0;
 double loadav = 0;
 double loadtotal = 0;
 int runstatus = 0;
+unsigned long nextreadsoi =0;
 #define ioport 7
 #define drySoil 590 // Example dry value (in air)
 #define wetSoil 273 // Example wet value (in cup of water)
@@ -102,6 +103,7 @@ struct
   int readdhttime = 600;
   int timezone = 25000;
   int havesoisensor = 0;
+  int readnextsoi = 1000;
   String updatetimestampurl;
 } configdata;
 class Dhtbuffer
@@ -173,8 +175,10 @@ void loadconfigtoram()
   configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.130/timestamp");
   configdata.timezone = cfg.getIntConfig("timezone", 25000);
   configdata.havesoisensor = cfg.getIntConfig("havesoisensor", 0);
+  configdata.readnextsoi = cfg.getIntConfig("readnextsoi",10000);
   AirValue = cfg.getIntConfig("airvalue", 840);
   WaterValue = cfg.getIntConfig("watervalue", 470);
+
 }
 unsigned long getUptime()
 {
@@ -182,13 +186,23 @@ unsigned long getUptime()
 }
 void havesoi()
 {
-  if (configdata.havesoisensor)
+  if (configdata.havesoisensor && millis() >= nextreadsoi)
   {
+    
     int moisture = analogRead(soisensorPin);
     a0value = moisture;
     int moisturePercent = map(moisture, AirValue, WaterValue, 0, 100);
     pfHum = moisturePercent;
-    delay(100);
+    Serial.print("Read Soi Sensore  " );
+    Serial.print("Value ");
+    Serial.print(a0value);
+    Serial.print("  ");
+
+    Serial.print(pfHum);
+    Serial.println(" %");
+ 
+    message = "read soi "+ String(pfHum)+ String("%");
+    nextreadsoi = millis()+configdata.readnextsoi;
   }
 }
 void updateTime()
@@ -950,6 +964,7 @@ void setup()
   ota();
   checkin();
   updateTime();
+  nextreadsoi = millis()+configdata.readnextsoi;
 }
 
 void printIPAddressOfHost(const char *host)
