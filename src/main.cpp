@@ -16,14 +16,14 @@
 #include <ESP8266Ping.h>
 #include <LITTLEFS.h>
 #include "Configfile.h"
-
+#include "moveavg.h"
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "checkconnection.h"
 #include "html.h"
 
-#define jsonbuffersize 1024
-const String version = "128";
+#define jsonbuffersize 2024
+const String version = "132";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -61,7 +61,7 @@ long loadcount = 0;
 double loadav = 0;
 double loadtotal = 0;
 int runstatus = 0;
-unsigned long nextreadsoi =0;
+unsigned long nextreadsoi = 0;
 #define ioport 7
 #define drySoil 590 // Example dry value (in air)
 #define wetSoil 273 // Example wet value (in cup of water)
@@ -128,7 +128,7 @@ Dhtbuffer dhtbuffer;
 Ticker flipper;
 #define b_led 2 // 1 for ESP-01, 2 for ESP-12
 ESP8266WiFiMulti WiFiMulti;
-
+boolean findsoinow = false;
 // ESP8266WebServer server(80);
 AsyncWebServer server(80);
 // Timer t, t2;
@@ -175,10 +175,9 @@ void loadconfigtoram()
   configdata.updatetimestampurl = cfg.getConfig("updatetimestampurl", "http://192.168.88.130/timestamp");
   configdata.timezone = cfg.getIntConfig("timezone", 25000);
   configdata.havesoisensor = cfg.getIntConfig("havesoisensor", 0);
-  configdata.readnextsoi = cfg.getIntConfig("readnextsoi",10000);
+  configdata.readnextsoi = cfg.getIntConfig("readnextsoi", 10000);
   AirValue = cfg.getIntConfig("airvalue", 840);
-  WaterValue = cfg.getIntConfig("watervalue", 470);
-
+  WaterValue = cfg.getIntConfig("wetvalue", 470);
 }
 unsigned long getUptime()
 {
@@ -188,24 +187,36 @@ void havesoi()
 {
   if (configdata.havesoisensor && millis() >= nextreadsoi)
   {
-    
+
     int moisture = analogRead(soisensorPin);
     a0value = moisture;
+    Serial.print("A0 read is:");
+    Serial.println(a0value);
+    Serial.print("Air:");
+    Serial.println(AirValue);
+
+    Serial.print("Wet:");
+    Serial.println(WaterValue);
+    if (AirValue == WaterValue)
+    { // ถ้าเท่ากันมันจะ ERROR
+      cfg.addConfig("wetvalue", String(WaterValue - 10));
+      WaterValue -= 10;
+    }
     int moisturePercent = map(moisture, AirValue, WaterValue, 0, 100);
     pfHum = moisturePercent;
-    Serial.print("Read Soi Sensore  " );
+    Serial.print("Read Soi Sensore  ");
     Serial.print("Value ");
     Serial.print(a0value);
     Serial.print("  ");
 
     Serial.print(pfHum);
     Serial.println(" %");
- 
-    message = "read soi "+ String(pfHum)+ String("%");
-    nextreadsoi = millis()+configdata.readnextsoi;
+
+    message = "read soi " + String(pfHum) + String("%");
+    nextreadsoi = millis() + configdata.readnextsoi;
   }
 }
-void updateTime()
+void  updateTime()
 {
   WiFiClient client;
   HTTPClient http;
@@ -341,6 +352,65 @@ void readDHT()
     dhtbuffer.count = 120; // update buffer life time
   }
 }
+void findwetair()
+{
+
+  if (findsoinow)
+  {
+    canuseled = 0;
+    MoveAvg wet(15);
+    MoveAvg air(15);
+
+    Serial.println("Start find air and wet value wait in 1 min");
+    digitalWrite(2, 0);
+    for (int i = 0; i < 60; i++)
+    {
+      digitalWrite(2, !digitalRead(2));
+      delay(200);
+    }
+    for (int i = 0; i < 15; i++)
+    {
+      int a = analogRead(A0);
+      Serial.println(a);
+      wet.pushValue(a);
+      delay(2000);
+      digitalWrite(2, !digitalRead(2));
+    }
+
+    WaterValue = wet.av();
+    Serial.print("Wet value:");
+    Serial.println(WaterValue);
+    cfg.addConfig("wetvalue", WaterValue);
+    digitalWrite(2, 0);
+    Serial.println("find air wait in 1 min");
+    for (int i = 0; i < 60; i++)
+    {
+      digitalWrite(2, !digitalRead(2));
+      delay(200);
+    }
+    for (int i = 0; i < 15; i++)
+    {
+      int a = analogRead(A0);
+      Serial.println(a);
+      air.pushValue(a);
+      delay(2000);
+      digitalWrite(2, !digitalRead(2));
+    }
+
+    AirValue = air.av();
+    cfg.addConfig("airvalue", AirValue);
+    Serial.print("Air value:");
+    Serial.println(AirValue);
+
+    if (AirValue == WaterValue)
+    {
+      WaterValue -= 300;
+      cfg.addConfig("wetvalue", String(WaterValue));
+    }
+    canuseled = 1;
+    findsoinow = false;
+  }
+}
 void updateNTP()
 {
   timeClient.update();
@@ -472,7 +542,7 @@ String makestatus()
   dd["wifitimeout"] = wifitimeout;
   dd["config.connectiontime"] = configdata.wifitimeout;
   dd["timestamp"] = timestamp;
-  dd["a0"]=a0value;
+  dd["a0"] = a0value;
   serializeJsonPretty(dd, b, f);
   return String(b);
 }
@@ -750,24 +820,24 @@ String fillconfig(const String &var)
 void finddry(AsyncWebServerRequest *request)
 {
 
-    int dryvalue = analogRead(soisensorPin);
-    String s = "{\"airvalue\":" + String(dryvalue) + String("}");
-    cfg.addConfig("airvalue",dryvalue);
-    AirValue =  dryvalue;
-    request->send(200, "application/json", s);
+  int dryvalue = analogRead(soisensorPin);
+  String s = "{\"airvalue\":" + String(dryvalue) + String("}");
+  cfg.addConfig("airvalue", dryvalue);
+  AirValue = dryvalue;
+  request->send(200, "application/json", s);
 
-    // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
+  // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
 }
 void findwet(AsyncWebServerRequest *request)
 {
 
-    int wetvalue = analogRead(soisensorPin);
-    String s = "{\"wetvalue\":" + String(wetvalue) + String("}");
-    cfg.addConfig("wetvalue",wetvalue);
-    WaterValue =  wetvalue;
-    request->send(200, "application/json", s);
+  int wetvalue = analogRead(soisensorPin);
+  String s = "{\"wetvalue\":" + String(wetvalue) + String("}");
+  cfg.addConfig("wetvalue", wetvalue);
+  WaterValue = wetvalue;
+  request->send(200, "application/json", s);
 
-    // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
+  // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
 }
 void setHttp()
 {
@@ -795,6 +865,11 @@ void setHttp()
         cfg.remove(v);
         loadconfigtoram();
   request->send(200, "application/json", "{\"remove\":\"" + v + "\"}"); });
+  server.on("/findsoi", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+                  findsoinow = true;
+                  request->send(200, "application/json", "{\"findsoi\":\"ok\",\"date\":\""+fulldate()+"\"}"); });
+
   server.on("/setconfigwww", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/html", configfile_html, fillconfig); });
   server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -883,7 +958,8 @@ void setHttp()
          String v = request->arg("configname");
   String value = request->arg("value");
   cfg.addConfig(v, value);
-  request->send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}"); });
+  request->send(200, "application/json", "{\"setconfig\":\"" + v + "\",\"value\":\"" + value + "\"}");
+  loadconfigtoram(); });
 
   server.begin(); // เปิด TCP Server
   Serial.println("Server started");
@@ -943,7 +1019,7 @@ void setup()
 {
 
   Serial.begin(9600);
-  cfg.setbuffer(2048);
+  cfg.setbuffer(3048);
 
   if (!cfg.openFile())
   {
@@ -964,7 +1040,7 @@ void setup()
   ota();
   checkin();
   updateTime();
-  nextreadsoi = millis()+configdata.readnextsoi;
+  nextreadsoi = millis() + configdata.readnextsoi;
 }
 
 void printIPAddressOfHost(const char *host)
@@ -1087,4 +1163,5 @@ void loop()
   checkkey();
   checktimetask();
   havesoi();
+  findwetair();
 }
