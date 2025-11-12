@@ -23,7 +23,7 @@
 #include "html.h"
 
 #define jsonbuffersize 2024
-const String version = "132";
+const String version = "136";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -216,7 +216,7 @@ void havesoi()
     nextreadsoi = millis() + configdata.readnextsoi;
   }
 }
-void  updateTime()
+void updateTime()
 {
   WiFiClient client;
   HTTPClient http;
@@ -555,7 +555,7 @@ void checkin()
   long f = system_get_free_heap_size();
   if (!runstatus)
   {
-    DynamicJsonDocument dy(jsonbuffersize);
+    DynamicJsonDocument dy(1024);
     char b[jsonbuffersize];
     WiFiClient client;
     if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
@@ -580,21 +580,24 @@ void checkin()
     String payload = http.getString(); // Get the response payload
     Serial.print(" Http Code:");
     Serial.println(httpCode); // Print HTTP return code
+    http.end();               // Close connection
     if (httpCode == 200)
     {
-      DynamicJsonDocument bbb(jsonbuffersize);
+      // DynamicJsonDocument bbb(jsonbuffersize);
+      dy.clear();
       Serial.print(" Play load:");
       Serial.println(payload); // Print request response payload
-      deserializeJson(bbb, payload);
-      // JsonObject obj = bbb.as<JsonObject>();
-      // String name = bbb["name"].as<String>();
-      String n = bbb["name"];
-      name = n;
-      cfg.addConfig("name", n);
+      deserializeJson(dy, payload);
+      JsonObject obj = dy.as<JsonObject>();
+      name = dy["name"].as<String>();
+      // cfg.addConfig("name", name);
       Serial.println(name);
     }
+    else if (httpCode == -1)
+    {
+      WiFi.reconnect();
+    }
 
-    http.end(); // Close connection
     busy = false;
     long l = system_get_free_heap_size();
     Serial.print("Use ram for checkin:");
@@ -1043,22 +1046,22 @@ void setup()
   nextreadsoi = millis() + configdata.readnextsoi;
 }
 
-void printIPAddressOfHost(const char *host)
-{
-  IPAddress resolvedIP;
-  if (!WiFi.hostByName(host, resolvedIP))
-  {
-    Serial.println("DNS lookup failed.  Count..." + String(configdata.restarttime));
-    Serial.flush();
-    // restarttime++; //เพิ่มขึ้น
-    if (restarttime > configdata.restarttime && configdata.havetorestart)
-      ESP.reset();
-  }
-  restarttime = 0; // ติดต่อได้ก็ reset ไปเลย
-  Serial.print(host);
-  Serial.print(" IP: ");
-  Serial.println(resolvedIP);
-}
+// void printIPAddressOfHost(const char *host)
+// {
+//   IPAddress resolvedIP;
+//   if (!WiFi.hostByName(host, resolvedIP))
+//   {
+//     Serial.println("DNS lookup failed.  Count..." + String(configdata.restarttime));
+//     Serial.flush();
+//     // restarttime++; //เพิ่มขึ้น
+//     if (restarttime > configdata.restarttime && configdata.havetorestart)
+//       ESP.reset();
+//   }
+//   restarttime = 0; // ติดต่อได้ก็ reset ไปเลย
+//   Serial.print(host);
+//   Serial.print(" IP: ");
+//   Serial.println(resolvedIP);
+// }
 void checkinnow()
 {
   checkin();
