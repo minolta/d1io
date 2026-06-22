@@ -21,9 +21,11 @@
 #include <ESPAsyncWebServer.h>
 #include "checkconnection.h"
 #include "html.h"
+#include "memlog.h"
+#include "config_desc.h"
 
 #define jsonbuffersize 2024
-const String version = "136";
+const String version = "137";
 String name = "d1io";
 const String type = "D1IO";
 void loadconfigtoram();
@@ -178,6 +180,15 @@ void loadconfigtoram()
   configdata.readnextsoi = cfg.getIntConfig("readnextsoi", 10000);
   AirValue = cfg.getIntConfig("airvalue", 840);
   WaterValue = cfg.getIntConfig("wetvalue", 470);
+  memlogSetSlots(cfg.getIntConfig("logslots", 16));
+
+  String otaurl = cfg.getConfig("otaurl", "http://192.168.88.5:888/rest/fw/update/d1io/");
+  if (otaurl.indexOf("/update/sensor/") >= 0 || otaurl.indexOf("/espupdate/sensor/") >= 0)
+  {
+    otaurl.replace("/update/sensor/", "/update/d1io/");
+    otaurl.replace("/espupdate/sensor/", "/espupdate/d1io/");
+    cfg.addConfig("otaurl", otaurl);
+  }
 }
 unsigned long getUptime()
 {
@@ -213,6 +224,9 @@ void havesoi()
     Serial.println(" %");
 
     message = "read soi " + String(pfHum) + String("%");
+    char logmsg[28];
+    snprintf(logmsg, sizeof(logmsg), "pct=%d raw=%d", moisturePercent, moisture);
+    memlogAdd(MEMLOG_SOI, moisturePercent, logmsg);
     nextreadsoi = millis() + configdata.readnextsoi;
   }
 }
@@ -305,6 +319,8 @@ void initConfig()
   cfg.addConfig("havesht", 0);
   cfg.addConfig("havesonic", 0);
   cfg.addConfig("haveoled", 0);
+  cfg.addConfig("logslots", 16);
+  cfg.addConfig("otaurl", "http://192.168.88.5:888/rest/fw/update/d1io/");
 }
 Portio ports[ioport];
 
@@ -409,6 +425,9 @@ void findwetair()
     }
     canuseled = 1;
     findsoinow = false;
+    char logmsg[28];
+    snprintf(logmsg, sizeof(logmsg), "cal wet=%d air=%d", WaterValue, AirValue);
+    memlogAdd(MEMLOG_SOI, WaterValue, logmsg);
   }
 }
 void updateNTP()
@@ -433,7 +452,7 @@ void ota()
     return; // ออกเลยถ้ามีการ run อยู่
   WiFiClient client;
 
-  String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.21:2005/rest/fw/update/d1io/");
+  String urlfromfile = cfg.getConfig("otaurl", "http://192.168.88.5:888/rest/fw/update/d1io/");
 
   String url = urlfromfile + version;
   Serial.println("CALL " + url);
@@ -443,13 +462,16 @@ void ota()
   case HTTP_UPDATE_FAILED:
     Serial.println("[update] Update failed.");
     message = "Update failed";
+    memlogAdd(MEMLOG_OTA, ESPhttpUpdate.getLastError(), message);
     break;
   case HTTP_UPDATE_NO_UPDATES:
     Serial.println("[update] Update no Update.");
     message = "Device already updated";
+    memlogAdd(MEMLOG_OTA, 0, message);
     break;
   case HTTP_UPDATE_OK:
     Serial.println("[update] Update ok."); // may not called we reboot the ESP
+    memlogAdd(MEMLOG_OTA, 200, "OTA ok reboot");
     break;
   }
 }
@@ -560,6 +582,7 @@ void checkin()
     WiFiClient client;
     if (WiFi.status() != WL_CONNECTED) // รอการเชื่อมต่อ
     {
+      memlogAdd(MEMLOG_CHECKIN, -1, "no WiFi");
       return;
     }
     busy = true;
@@ -592,10 +615,16 @@ void checkin()
       name = dy["name"].as<String>();
       // cfg.addConfig("name", name);
       Serial.println(name);
+      memlogAdd(MEMLOG_CHECKIN, httpCode, name.c_str());
     }
     else if (httpCode == -1)
     {
+      memlogAdd(MEMLOG_CHECKIN, httpCode, "reconnect");
       WiFi.reconnect();
+    }
+    else
+    {
+      memlogAdd(MEMLOG_CHECKIN, httpCode, "checkin fail");
     }
 
     busy = false;
@@ -812,9 +841,9 @@ String fillconfig(const String &var)
     {
       String v = dy[keyValue.key()];
       String k = keyValue.key().c_str();
-      tr += "<tr><td>" + k + "</td><td> <label id=" + k + "value>" + v + "</label> </td> <td> <input id = " + k + " value =\"" + v + "\"></td><td><button id=btn onClick=\"setvalue(this,'" + k + "','" + v + "')\">Set</button></td><td><button id=btn onClick=\"remove('" + k + "')\">Remove</button></td></tr>";
+      tr += configRowHtml(k, v);
     }
-    tr += "<tr><td>heap</td><td colspan=4>" + String(ESP.getFreeHeap()) + "</td></tr>";
+    tr += "<tr><td>heap</td><td class=\"desc\">Free RAM now</td><td colspan=4>" + String(ESP.getFreeHeap()) + "</td></tr>";
 
     return tr;
   }
@@ -827,6 +856,7 @@ void finddry(AsyncWebServerRequest *request)
   String s = "{\"airvalue\":" + String(dryvalue) + String("}");
   cfg.addConfig("airvalue", dryvalue);
   AirValue = dryvalue;
+  memlogAdd(MEMLOG_SOI, dryvalue, "cal air dry");
   request->send(200, "application/json", s);
 
   // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
@@ -838,12 +868,42 @@ void findwet(AsyncWebServerRequest *request)
   String s = "{\"wetvalue\":" + String(wetvalue) + String("}");
   cfg.addConfig("wetvalue", wetvalue);
   WaterValue = wetvalue;
+  memlogAdd(MEMLOG_SOI, wetvalue, "cal wet");
   request->send(200, "application/json", s);
 
   // หาเวลา diff เวลาเรียก time stamp จะเอา diff ไปบวกกับ millis() ทำให้ได้ค่าเวลาที่จริง
 }
 void setHttp()
 {
+  server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", logs_html); });
+  server.on("/logs.json", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+        const size_t cap = memlogJsonCapacity();
+        char *buf = (char *)malloc(cap);
+        if (buf == nullptr)
+        {
+            request->send(500, "application/json", "{\"logs\":[],\"count\":0,\"max\":0,\"heap\":0,\"error\":\"nomem\"}");
+            return;
+        }
+        if (memlogWriteJson(buf, cap, version.c_str()) == 0)
+        {
+            free(buf);
+            request->send(500, "application/json", "{\"logs\":[],\"count\":0,\"max\":0,\"heap\":0,\"error\":\"json\"}");
+            return;
+        }
+        request->send(200, "application/json", buf);
+        free(buf); });
+  server.on("/logs/clear", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+        memlogClear();
+        request->send(200, "application/json", "{\"ok\":1}"); });
+  server.on("/resetconfig", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+        cfg.resettodefault();
+        loadconfigtoram();
+        request->send(200, "application/json", "{\"setconfig\":\"ok\",\"value\":\"ok\"}");
+        ESP.restart(); });
   server.on("/findair", finddry);
   server.on("/findwet", findwet);
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -871,6 +931,7 @@ void setHttp()
   server.on("/findsoi", HTTP_GET, [](AsyncWebServerRequest *request)
             {
                   findsoinow = true;
+                  memlogAdd(MEMLOG_SOI, 0, "cal findsoi start");
                   request->send(200, "application/json", "{\"findsoi\":\"ok\",\"date\":\""+fulldate()+"\"}"); });
 
   server.on("/setconfigwww", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -934,6 +995,7 @@ void setHttp()
     v = "1";
   }
   addTorun(port, d.toInt(), v.toInt(), w.toInt());
+  memlogAdd(MEMLOG_TASK, port, ("run " + p).c_str());
   dy["status"] = "ok";
   dy["port"] = p;
   dy["runtime"] = d;
@@ -1071,6 +1133,7 @@ void checkintask()
   if (checkintime > configdata.checkintime)
   {
     checkintime = 0;
+    memlogTask("checkin");
     checkin();
   }
 }
@@ -1080,6 +1143,7 @@ void otatask()
   if (otatime > configdata.otatime)
   {
     otatime = 0;
+    memlogTask("ota");
     ota();
   }
 }
